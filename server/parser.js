@@ -105,8 +105,6 @@ function normalizeCompanyName(raw) {
 function splitTranscriptIntoSegments(transcript) {
   const anchorPatterns = [
     /\btypeface\.ai\b/i,
-    /\b(?:then\s+)?(?:restart|sierra)[^.]{0,40}palo\s+alto\b/i,
-    /\bpalo\s+alto\b/i,
     /\bret(?:ail|ell)(?:\.ai)?\b/i,
     /\br\s*e\s*t\s*e\s*l\s*l\b/i,
     /\bophelia\b/i,
@@ -158,7 +156,6 @@ function extractCompanyFromSegment(segment) {
   if (/r\s*e\s*t\s*e\s*l\s*l|retell/i.test(segment)) return 'Retell AI';
   if (/retail\.ai/i.test(segment)) return 'Retell AI';
   if (/ophelia|o\s+p\s+h\s+e\s+l\s+i\s+a/i.test(segment)) return 'Ophelia';
-  if (/palo\s+alto|sierra|restart/i.test(segment)) return 'Sierra';
 
   const spelled = segment.match(/\b(?:named|called)\s+((?:[a-z]\s+){2,}[a-z])\b/i);
   if (spelled) return normalizeCompanyName(spelled[1]);

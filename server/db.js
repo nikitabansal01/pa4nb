@@ -18,6 +18,7 @@ export async function getDb() {
 
 export async function getApplications() {
   const database = await getDb();
+  await database.read();
   return database.data.applications.sort(
     (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
   );
