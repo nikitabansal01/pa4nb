@@ -110,7 +110,10 @@ function CompanyTableRow({ app, onUpdate, hideColumn }) {
   return (
     <tr className="company-table__row">
       <th scope="row" className="company-table__company">
-        <span className="company-table__company-name">{app.company || 'Unknown'}</span>
+        <span className="company-table__company-name">
+          {app.company || 'Unknown'}
+          {app.isExample && <span className="example-badge example-badge--table">Example</span>}
+        </span>
         <span className="company-table__updated">{relativeTime(app.updatedAt)}</span>
       </th>
       <td className="company-table__cell company-table__cell--muted">

@@ -3,11 +3,24 @@ import { Briefcase, RefreshCw, LayoutGrid, Building2 } from 'lucide-react';
 import VoiceDump from './components/VoiceDump';
 import Dashboard from './components/Dashboard';
 import CompanyBrowser from './components/CompanyBrowser';
-import { useApplications, useHealth } from './hooks';
+import AuthPanel from './components/AuthPanel';
+import DataSourceBanner from './components/DataSourceBanner';
+import { useApplications, useHealth, useAuth } from './hooks';
 import './App.css';
 
 export default function App() {
-  const { applications, loading, error, refresh, submitVoiceDump, updateApplication } = useApplications();
+  const { isAuthenticated } = useAuth();
+  const {
+    applications,
+    loading,
+    error,
+    dataSource,
+    refresh,
+    submitVoiceDump,
+    updateApplication,
+    clearExamples,
+    resetToExamples,
+  } = useApplications();
   const { aiEnabled } = useHealth();
   const [processing, setProcessing] = useState(false);
   const [lastSummary, setLastSummary] = useState(null);
@@ -46,6 +59,7 @@ export default function App() {
           <span className={`mode-badge ${aiEnabled ? 'mode-badge--ai' : ''}`}>
             {aiEnabled ? 'AI parsing on' : 'Heuristic mode'}
           </span>
+          <AuthPanel />
           <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh">
             <RefreshCw size={18} />
           </button>
@@ -53,6 +67,13 @@ export default function App() {
       </header>
 
       <main className="main">
+        <DataSourceBanner
+          dataSource={dataSource}
+          isAuthenticated={isAuthenticated}
+          onClearExamples={clearExamples}
+          onResetExamples={resetToExamples}
+        />
+
         <VoiceDump onSubmit={handleVoiceSubmit} processing={processing} />
 
         {lastSummary && (

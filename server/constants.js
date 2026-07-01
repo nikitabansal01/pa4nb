@@ -74,4 +74,5 @@ export const DEFAULT_APPLICATION = {
   needsFollowUp: false,
   needsPrep: false,
   notes: '',
+  isExample: false,
 };

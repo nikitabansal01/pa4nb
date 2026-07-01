@@ -31,7 +31,10 @@ export default function ApplicationCard({ app }) {
     <article className="app-card" style={{ '--accent': statusColor }}>
       <header className="app-card__header">
         <div>
-          <h3>{app.company || 'Unknown company'}</h3>
+          <div className="app-card__title-row">
+            <h3>{app.company || 'Unknown company'}</h3>
+            {app.isExample && <span className="example-badge">Example</span>}
+          </div>
           {app.positionTitle && (
             <p className="app-card__role">
               <Briefcase size={14} />

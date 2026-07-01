@@ -1,25 +1,36 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { readFile, rename } from 'fs/promises';
+import { existsSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
-import { getApplications, saveApplications } from './db.js';
+import { registerUser, loginUser, signToken } from './auth.js';
+import { getUserApplications, saveUserApplications, migrateUserApplications, loadExampleData } from './userDb.js';
+import { optionalAuth, requireAuth } from './middleware.js';
 import { parseVoiceDump, applyVoiceDumpResult } from './parser.js';
 import { DEFAULT_APPLICATION, STATUSES, INDUSTRIES, BUSINESS_MODELS, FUNDING_STAGES } from './constants.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const LEGACY_DB = join(__dirname, '..', 'db.json');
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 
 app.get('/', (_req, res) => {
   res.json({
     name: 'Job Hunt Assistant API',
     status: 'ok',
     ui: 'http://localhost:5173',
+    storage: 'Local browser storage by default; optional sign-in for cloud save',
     endpoints: {
       health: '/api/health',
-      applications: '/api/applications',
+      examples: '/api/examples',
+      auth: 'POST /api/auth/register | /api/auth/login',
+      applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
       voiceDump: 'POST /api/voice-dump',
       meta: '/api/meta',
     },
@@ -27,68 +38,152 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, aiEnabled: Boolean(process.env.OPENAI_API_KEY) });
+  res.json({
+    ok: true,
+    aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+    authEnabled: true,
+  });
 });
 
-app.get('/api/applications', async (_req, res) => {
-  const applications = await getApplications();
+app.get('/api/examples', async (_req, res) => {
+  const applications = await loadExampleData();
+  res.json({ applications, isExampleData: true });
+});
+
+app.get('/api/legacy/import', async (_req, res) => {
+  if (!existsSync(LEGACY_DB)) {
+    return res.json({ applications: [], imported: false });
+  }
+
+  try {
+    const raw = await readFile(LEGACY_DB, 'utf8');
+    const data = JSON.parse(raw);
+    const applications = (data.applications || []).map((app) => ({
+      ...app,
+      isExample: false,
+    }));
+
+    await rename(LEGACY_DB, `${LEGACY_DB}.migrated`).catch(() => {});
+
+    res.json({ applications, imported: true });
+  } catch {
+    res.json({ applications: [], imported: false });
+  }
+});
+
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { email, password, localApplications } = req.body;
+    const user = await registerUser(email, password);
+    const token = signToken(user);
+
+    if (Array.isArray(localApplications) && localApplications.length > 0) {
+      const applications = await migrateUserApplications(user.id, localApplications);
+      return res.status(201).json({ token, user, applications });
+    }
+
+    res.status(201).json({ token, user, applications: [] });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login', async (req, res) => {
+  try {
+    const { email, password, localApplications } = req.body;
+    const user = await loginUser(email, password);
+    const token = signToken(user);
+
+    if (Array.isArray(localApplications) && localApplications.length > 0) {
+      const applications = await migrateUserApplications(user.id, localApplications);
+      return res.json({ token, user, applications });
+    }
+
+    const applications = await getUserApplications(user.id);
+    res.json({ token, user, applications });
+  } catch (error) {
+    res.status(401).json({ error: error.message });
+  }
+});
+
+app.get('/api/auth/me', requireAuth, async (req, res) => {
+  const applications = await getUserApplications(req.user.id);
+  res.json({ user: req.user, applications });
+});
+
+app.get('/api/applications', requireAuth, async (req, res) => {
+  const applications = await getUserApplications(req.user.id);
   res.json(applications);
 });
 
-app.post('/api/applications', async (req, res) => {
-  const applications = await getApplications();
+app.post('/api/applications', requireAuth, async (req, res) => {
+  const applications = await getUserApplications(req.user.id);
   const now = new Date().toISOString();
   const application = {
     id: uuidv4(),
     createdAt: now,
     updatedAt: now,
+    isExample: false,
     ...DEFAULT_APPLICATION,
     ...req.body,
   };
   applications.unshift(application);
-  await saveApplications(applications);
+  await saveUserApplications(req.user.id, applications);
   res.status(201).json(application);
 });
 
-app.put('/api/applications/:id', async (req, res) => {
-  const applications = await getApplications();
+app.put('/api/applications/:id', requireAuth, async (req, res) => {
+  const applications = await getUserApplications(req.user.id);
   const index = applications.findIndex((a) => a.id === req.params.id);
   if (index === -1) return res.status(404).json({ error: 'Not found' });
 
   applications[index] = {
     ...applications[index],
     ...req.body,
+    isExample: false,
     updatedAt: new Date().toISOString(),
   };
-  await saveApplications(applications);
+  await saveUserApplications(req.user.id, applications);
   res.json(applications[index]);
 });
 
-app.delete('/api/applications/:id', async (req, res) => {
-  const applications = await getApplications();
+app.delete('/api/applications/:id', requireAuth, async (req, res) => {
+  const applications = await getUserApplications(req.user.id);
   const filtered = applications.filter((a) => a.id !== req.params.id);
   if (filtered.length === applications.length) {
     return res.status(404).json({ error: 'Not found' });
   }
-  await saveApplications(filtered);
+  await saveUserApplications(req.user.id, filtered);
   res.status(204).end();
 });
 
-app.post('/api/voice-dump', async (req, res) => {
-  const { transcript } = req.body;
+app.post('/api/voice-dump', optionalAuth, async (req, res) => {
+  const { transcript, existingApplications } = req.body;
   if (!transcript?.trim()) {
     return res.status(400).json({ error: 'Transcript is required' });
   }
 
-  const existing = await getApplications();
+  const existing = req.user
+    ? await getUserApplications(req.user.id)
+    : Array.isArray(existingApplications)
+      ? existingApplications
+      : [];
+
   const result = await parseVoiceDump(transcript.trim(), existing);
-  const updated = applyVoiceDumpResult(existing, result);
-  await saveApplications(updated);
+  const updated = applyVoiceDumpResult(existing, result).map((app) => ({
+    ...app,
+    isExample: false,
+  }));
+
+  if (req.user) {
+    await saveUserApplications(req.user.id, updated);
+  }
 
   res.json({
     summary: result.summary,
     applications: updated,
     affected: result.applications.map((a) => a.id),
+    persisted: Boolean(req.user),
   });
 });
 
@@ -108,4 +203,5 @@ app.listen(PORT, () => {
       ? 'AI parsing: enabled (OpenAI)'
       : 'AI parsing: heuristic mode (set OPENAI_API_KEY for smarter parsing)'
   );
+  console.log('Storage: local browser by default; sign-in saves to your account');
 });
