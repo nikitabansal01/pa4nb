@@ -1,12 +1,22 @@
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Loader2, Sparkles } from 'lucide-react';
+import { Mic, Square, Loader2, Sparkles, Send } from 'lucide-react';
 
-export default function VoiceDump({ onSubmit, processing }) {
+const AREA_HINTS = {
+  overview: 'life balance, how an area feels, or job search updates',
+  compass: 'thoughts on work and life meaning, or job search updates',
+  work: 'interviews, applications, status changes, and next steps',
+  health: 'energy, sleep, exercise, or job search updates',
+  play: 'what brings you joy, or job search updates',
+  love: 'relationships and connection, or job search updates',
+};
+
+export default function VoiceDump({ onSubmit, processing, currentArea = 'overview' }) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interim, setInterim] = useState('');
   const recognitionRef = useRef(null);
   const supported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
+  const hint = AREA_HINTS[currentArea] || AREA_HINTS.overview;
 
   useEffect(() => {
     if (!supported) return;
@@ -46,8 +56,6 @@ export default function VoiceDump({ onSubmit, processing }) {
       setListening(false);
       setInterim('');
     } else {
-      setTranscript('');
-      setInterim('');
       recognitionRef.current?.start();
       setListening(true);
     }
@@ -56,74 +64,76 @@ export default function VoiceDump({ onSubmit, processing }) {
   const handleSubmit = async () => {
     const text = `${transcript} ${interim}`.trim();
     if (!text || processing) return;
+    if (listening) recognitionRef.current?.stop();
+    setListening(false);
+    setInterim('');
     await onSubmit(text);
     setTranscript('');
-    setInterim('');
   };
 
   const displayText = `${transcript} ${interim}`.trim();
+  const placeholder = listening
+    ? 'Listening… keep talking'
+    : supported
+      ? 'Type or tap the mic — interviews, check-ins, reflections…'
+      : 'Type your update (voice needs Chrome or Safari)';
 
   return (
-    <section className="voice-panel">
+    <section className="voice-panel voice-panel--global">
       <div className="voice-panel__header">
         <Sparkles size={20} />
         <div>
-          <h2>Voice dump</h2>
-          <p>Talk through interviews, status updates, and next steps — I'll sort it out.</p>
+          <h2>Voice update</h2>
+          <p>
+            Ramble about {hint}. Job-related updates sync to your pipeline.
+          </p>
         </div>
       </div>
 
-      <div className={`voice-panel__transcript ${listening ? 'voice-panel__transcript--live' : ''}`}>
-        {displayText || (
-          <span className="voice-panel__placeholder">
-            {listening
-              ? 'Listening… tell me about your applications'
-              : 'Hit the mic and ramble — company, role, interview date, what’s next'}
-          </span>
-        )}
-      </div>
-
-      <div className="voice-panel__actions">
-        {supported ? (
-          <button
-            type="button"
-            className={`mic-btn ${listening ? 'mic-btn--active' : ''}`}
-            onClick={toggleListening}
-            disabled={processing}
-            aria-label={listening ? 'Stop recording' : 'Start recording'}
-          >
-            {listening ? <Square size={22} fill="currentColor" /> : <Mic size={26} />}
-            <span>{listening ? 'Stop' : 'Record'}</span>
-          </button>
-        ) : (
-          <p className="voice-panel__unsupported">Voice needs Chrome or Safari. Type below instead.</p>
-        )}
-
+      <div className={`voice-compose ${listening ? 'voice-compose--live' : ''}`}>
         <textarea
-          className="voice-panel__textarea"
-          placeholder="Or type your update here…"
+          className="voice-compose__input"
+          placeholder={placeholder}
           value={displayText}
           onChange={(e) => {
             setTranscript(e.target.value);
             setInterim('');
           }}
-          rows={3}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleSubmit();
+            }
+          }}
+          rows={2}
+          disabled={processing}
+          aria-label="Your update"
         />
 
-        <button
-          type="button"
-          className="submit-btn"
-          onClick={handleSubmit}
-          disabled={!displayText || processing}
-        >
-          {processing ? (
-            <>
-              <Loader2 size={18} className="spin" /> Processing…
-            </>
-          ) : (
-            'Update dashboard'
+        <div className="voice-compose__actions">
+          {supported && (
+            <button
+              type="button"
+              className={`voice-compose__mic ${listening ? 'voice-compose__mic--active' : ''}`}
+              onClick={toggleListening}
+              disabled={processing}
+              aria-label={listening ? 'Stop recording' : 'Start recording'}
+              aria-pressed={listening}
+            >
+              {listening ? <Square size={18} fill="currentColor" /> : <Mic size={20} />}
+            </button>
           )}
-        </button>
+
+          <button
+            type="button"
+            className="voice-compose__send"
+            onClick={handleSubmit}
+            disabled={!displayText || processing}
+            aria-label={processing ? 'Processing update' : 'Send update'}
+          >
+            {processing ? <Loader2 size={20} className="spin" /> : <Send size={20} />}
+          </button>
+        </div>
       </div>
     </section>
   );

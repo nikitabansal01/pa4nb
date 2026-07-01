@@ -1,8 +1,31 @@
-# PA for NB — Personal Assistant (Job Hunt MVP)
+# PA for NB — Personal Assistant
 
-Voice-powered personal assistant for tracking your job search. Dump updates by voice (or text), and watch your pipeline update on a vibrant dashboard.
+Life design app inspired by Stanford's *Designing Your Life*. Build your structure slowly: start with where you are, set your compass, then grow tools area by area.
 
-## MVP V0 — Job area
+## Architecture (Designing Your Life mapping)
+
+```
+PA for NB
+├── Overview          → HWPL dashboard (Health · Work · Play · Love gauges)
+├── Compass           → Workview + Lifeview (philosophy layer)
+├── Work              → Career execution
+│   ├── Workview      → career philosophy (same data as Compass, Work-only view)
+│   └── Job search    → voice dump, pipeline, company browser (V0 MVP)
+├── Health            → coming soon
+├── Play              → coming soon
+└── Love              → coming soon
+```
+
+| DYL concept | In this app |
+|-------------|-------------|
+| HWPL Dashboard | **Overview** — rate each area 0–100%, add notes |
+| Workview | **Compass** + **Work → Workview** |
+| Lifeview | **Compass** (whole-life meaning, not per-area) |
+| Wayfinding / Odyssey / Prototype | Planned for later phases |
+
+**Key design choice:** Career philosophy lives in **Workview**. Everything operational (job pipeline, voice dumps, interviews) lives under the **Work** area — not a separate top-level "Career" tab.
+
+## V0 — Job search (under Work)
 
 - **Voice dump**: speak naturally about interviews, status changes, next steps
 - **Smart parsing**: extracts company, role, industry, funding stage, interview dates, follow-ups, prep needs
@@ -80,4 +103,10 @@ pa-for-nb/
 
 ## Future areas (post-MVP)
 
-This is V0 for the **job** life area. The architecture is designed to add more areas later (health, relationships, learning, etc.) as separate modules.
+Following the DYL sequence, planned additions:
+
+1. **Wayfinding** — Good Time Journal (engagement + energy tracking)
+2. **Getting Unstuck** — mind maps, anchor problem reframes
+3. **Odyssey Plans** — three 5-year life sketches
+4. **Prototyping** — life design interviews, small experiments
+5. **Health / Play / Love** — area-specific tools beyond dashboard gauges

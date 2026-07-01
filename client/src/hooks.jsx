@@ -9,7 +9,10 @@ import {
   setLocalMeta,
   clearLocalData,
   authHeaders,
+  getLocalLifeDesign,
+  saveLocalLifeDesign,
 } from './storage';
+import { DEFAULT_LIFE_DESIGN } from './lifeDesign';
 
 const API = '/api';
 
@@ -261,6 +264,53 @@ export function useApplications() {
     updateApplication,
     clearExamples,
     resetToExamples,
+  };
+}
+
+export function useLifeDesign() {
+  const [data, setData] = useState(() => getLocalLifeDesign() || DEFAULT_LIFE_DESIGN);
+
+  const persist = useCallback((next) => {
+    setData(next);
+    saveLocalLifeDesign(next);
+  }, []);
+
+  const setGauge = useCallback(
+    (areaId, value) => {
+      persist({
+        ...data,
+        dashboard: { ...data.dashboard, [areaId]: value },
+      });
+    },
+    [data, persist]
+  );
+
+  const setGaugeNote = useCallback(
+    (areaId, note) => {
+      persist({
+        ...data,
+        dashboardNotes: { ...data.dashboardNotes, [areaId]: note },
+      });
+    },
+    [data, persist]
+  );
+
+  const setWorkview = useCallback(
+    (text) => persist({ ...data, workview: text }),
+    [data, persist]
+  );
+
+  const setLifeview = useCallback(
+    (text) => persist({ ...data, lifeview: text }),
+    [data, persist]
+  );
+
+  return {
+    data,
+    setGauge,
+    setGaugeNote,
+    setWorkview,
+    setLifeview,
   };
 }
 
