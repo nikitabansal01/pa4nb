@@ -147,8 +147,8 @@ export function useApplications() {
           throw new Error(data.error || 'Failed to load your saved applications');
         }
         const data = await res.json();
-        const local = getLocalApplications();
-        const localReal = local ? stripExamples(local) : [];
+        const remainingLocal = getLocalApplications();
+        const localReal = remainingLocal ? stripExamples(remainingLocal) : [];
 
         if (localReal.length > data.length) {
           const synced = await syncToAccount(localReal);
