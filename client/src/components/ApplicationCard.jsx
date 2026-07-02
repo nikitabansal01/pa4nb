@@ -1,20 +1,33 @@
 import { Calendar, Building2, Briefcase, DollarSign, ArrowRight, Bell, BookOpen } from 'lucide-react';
-import { STATUS_LABELS, STATUS_COLORS, PIPELINE_STATUSES, formatDate, relativeTime } from '../constants';
+import { STATUS_LABELS, STATUS_COLORS, PIPELINE_MILESTONES, formatDate, relativeTime } from '../constants';
 
 function Pipeline({ status }) {
-  const activeIndex = PIPELINE_STATUSES.indexOf(status);
+  const activeIndex = PIPELINE_MILESTONES.findIndex((milestone) =>
+    milestone.statuses.includes(status)
+  );
+  if (activeIndex === -1) return null;
 
   return (
-    <div className="pipeline">
-      {PIPELINE_STATUSES.map((step, i) => {
+    <div className="pipeline" aria-label={`Pipeline stage: ${STATUS_LABELS[status] || status}`}>
+      {PIPELINE_MILESTONES.map((milestone, i) => {
         const done = activeIndex >= 0 && i <= activeIndex;
-        const current = step === status;
-        const color = STATUS_COLORS[step];
+        const current = milestone.statuses.includes(status);
+        const color = STATUS_COLORS[milestone.colorKey];
 
         return (
-          <div key={step} className={`pipeline__step ${done ? 'pipeline__step--done' : ''} ${current ? 'pipeline__step--current' : ''}`}>
-            <div className="pipeline__dot" style={{ background: done ? color : undefined, boxShadow: current ? `0 0 12px ${color}` : undefined }} />
-            {i < PIPELINE_STATUSES.length - 1 && (
+          <div
+            key={milestone.key}
+            className={`pipeline__step ${done ? 'pipeline__step--done' : ''} ${current ? 'pipeline__step--current' : ''}`}
+            title={milestone.label}
+          >
+            <div className="pipeline__milestone">
+              <div
+                className="pipeline__dot"
+                style={{ background: done ? color : undefined, boxShadow: current ? `0 0 12px ${color}` : undefined }}
+              />
+              <span className="pipeline__label">{milestone.label}</span>
+            </div>
+            {i < PIPELINE_MILESTONES.length - 1 && (
               <div className="pipeline__line" style={{ background: done && activeIndex > i ? color : undefined }} />
             )}
           </div>

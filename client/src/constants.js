@@ -1,10 +1,10 @@
 export const STATUS_LABELS = {
   applied: 'Applied',
-  recruiter_screen: 'Recruiter Round',
-  phone_screen: 'Phone Screen',
-  interview_scheduled: 'Interview Scheduled',
-  interview_completed: 'Interview Done',
-  onsite: 'Onsite',
+  recruiter_screen: 'Recruiter / Phone Screen',
+  phone_screen: 'Hiring Manager Round',
+  interview_scheduled: 'Take-home / Onsite Scheduled',
+  interview_completed: 'Take-home / Onsite Done',
+  onsite: 'Final Onsite',
   offer: 'Offer',
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
@@ -102,6 +102,39 @@ export const PIPELINE_STATUSES = [
   'interview_completed',
   'onsite',
   'offer',
+];
+
+export const PIPELINE_MILESTONES = [
+  {
+    key: 'applied',
+    label: 'Applied',
+    statuses: ['applied'],
+    colorKey: 'applied',
+  },
+  {
+    key: 'screen',
+    label: 'Recruiter / Phone',
+    statuses: ['recruiter_screen'],
+    colorKey: 'recruiter_screen',
+  },
+  {
+    key: 'hiring_manager',
+    label: 'Hiring Manager',
+    statuses: ['phone_screen'],
+    colorKey: 'phone_screen',
+  },
+  {
+    key: 'take_home_onsite',
+    label: 'Take-home / Onsite',
+    statuses: ['interview_scheduled', 'interview_completed', 'onsite'],
+    colorKey: 'interview_scheduled',
+  },
+  {
+    key: 'offer',
+    label: 'Offer',
+    statuses: ['offer'],
+    colorKey: 'offer',
+  },
 ];
 
 export function formatDate(iso) {

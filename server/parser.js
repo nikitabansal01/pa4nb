@@ -36,7 +36,7 @@ Rules:
 - Decode spelled-out names (e.g. "r a y d a r dot xyz" -> "Raydar.xyz", "q v e n t u s" -> "Qventus").
 - Match existing applications by company name (fuzzy match OK) and reuse their id.
 - Merge new info into existing records; don't wipe fields unless the user corrects them.
-- Infer status from context (recruiter call -> recruiter_screen, hiring manager round done -> interview_completed, moving to next round -> interview_scheduled).
+- Infer status from context using this funnel: recruiter or phone screen -> recruiter_screen, hiring manager round -> phone_screen, take-home or onsite scheduled -> interview_scheduled, take-home or onsite completed -> interview_completed, final onsite -> onsite.
 - Set needsFollowUp when waiting to hear back. Set needsPrep for upcoming interviews.
 - Return ONLY valid JSON, no markdown.`;
 
@@ -172,14 +172,23 @@ function parseSingleSegment(segment, existingApps) {
   let status = 'applied';
   if (/offer/i.test(lower)) status = 'offer';
   else if (/reject/i.test(lower)) status = 'rejected';
-  else if (/onsite|on-site/i.test(lower)) status = 'onsite';
+  else if (/final round|final onsite/i.test(lower)) status = 'onsite';
+  else if (/take[\s-]?home|assignment|case study/i.test(lower)) {
+    status = /done|completed|submitted|finished|went well/i.test(lower)
+      ? 'interview_completed'
+      : 'interview_scheduled';
+  }
+  else if (/onsite|on-site/i.test(lower)) {
+    status = /done|completed|finished|went well/i.test(lower)
+      ? 'interview_completed'
+      : 'interview_scheduled';
+  }
   else if (/moving forward|next round|round three/i.test(lower)) status = 'interview_scheduled';
-  else if (/hiring manager.*round|round (?:two|2|three|3)/i.test(lower)) status = 'interview_completed';
+  else if (/hiring manager|manager round|round (?:two|2)/i.test(lower)) status = 'phone_screen';
   else if (/interview.*(done|completed|went well|finished)/i.test(lower)) status = 'interview_completed';
   else if (/interview.*(scheduled|tomorrow|next week)/i.test(lower)) status = 'interview_scheduled';
-  else if (/recruiter|recruiter call/i.test(lower)) status = 'recruiter_screen';
-  else if (/interviewed|hiring manager/i.test(lower)) status = 'recruiter_screen';
-  else if (/phone screen/i.test(lower)) status = 'phone_screen';
+  else if (/recruiter|recruiter call|phone screen/i.test(lower)) status = 'recruiter_screen';
+  else if (/interviewed/i.test(lower)) status = 'recruiter_screen';
 
   const incoming = {
     company,

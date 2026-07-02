@@ -771,6 +771,14 @@
   display: block;
 }
 
+.dashboard__stats-note {
+  margin: 0.35rem 0 0.85rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  max-width: 42rem;
+}
+
 .stats-row {
   display: flex;
   flex-wrap: wrap;
@@ -920,15 +928,24 @@
 /* Pipeline */
 .pipeline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0;
-  padding: 0.25rem 0;
+  padding: 0.35rem 0 0.15rem;
 }
 
 .pipeline__step {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   flex: 1;
+}
+
+.pipeline__milestone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  width: 4.8rem;
+  text-align: center;
 }
 
 .pipeline__dot {
@@ -945,12 +962,27 @@
   height: 14px;
 }
 
+.pipeline__label {
+  font-size: 0.62rem;
+  line-height: 1.2;
+  color: var(--text-muted);
+}
+
+.pipeline__step--done .pipeline__label {
+  color: var(--text-secondary);
+}
+
+.pipeline__step--current .pipeline__label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 .pipeline__line {
   flex: 1;
   height: 3px;
   background: rgba(255, 255, 255, 0.08);
   border-radius: 2px;
-  margin: 0 2px;
+  margin: 0.25rem 2px 0;
   transition: background 0.3s;
 }
 
