@@ -196,12 +196,18 @@ app.get('/api/meta', (_req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Job Assistant API running on http://localhost:${PORT}`);
-  console.log(
-    process.env.OPENAI_API_KEY
-      ? 'AI parsing: enabled (OpenAI)'
-      : 'AI parsing: heuristic mode (set OPENAI_API_KEY for smarter parsing)'
-  );
-  console.log('Storage: local browser by default; sign-in saves to your account');
-});
+export default app;
+
+const isMainModule = process.argv[1] === fileURLToPath(import.meta.url);
+
+if (isMainModule) {
+  app.listen(PORT, () => {
+    console.log(`Job Assistant API running on http://localhost:${PORT}`);
+    console.log(
+      process.env.OPENAI_API_KEY
+        ? 'AI parsing: enabled (OpenAI)'
+        : 'AI parsing: heuristic mode (set OPENAI_API_KEY for smarter parsing)'
+    );
+    console.log('Storage: local browser by default; sign-in saves to your account');
+  });
+}

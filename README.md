@@ -44,6 +44,75 @@ npm run dev
 - Frontend: http://localhost:5173
 - API: http://localhost:5001
 
+## Deploy on Vercel
+
+The app is configured for Vercel: the Vite client builds to static files, and the Express API runs as a serverless function at `/api/*`.
+
+### Cursor / agent plugin
+
+In Cursor, install the Vercel agent plugin with **`/add-plugin vercel`** (or use the plugin marketplace). The CLI command `npx plugins add vercel/vercel-plugin` is for Claude Code / Codex environments.
+
+### This app does **not** use Clerk
+
+Sign-in is **custom JWT + bcrypt** (`server/auth.js`), not [Clerk](https://clerk.com). Do **not** add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, or `VITE_CLERK_*` — the code never reads them.
+
+If Vercel shows a red error **"No environment variables were created"**, you are usually:
+
+- Pasting Clerk’s env block (wrong product — nothing will wire up), or
+- Using **bulk import** with an empty field, comments-only text, or duplicate keys that already exist, or
+- Importing branch-scoped vars on a project **not linked to Git**
+
+**Fix:** add the variables below **one at a time** in the dashboard (see manual steps).
+
+### Deploy steps
+
+1. Push the repo to GitHub (if not already).
+2. Import the project in [Vercel](https://vercel.com/new) — root directory stays `.` (Vercel reads `vercel.json`).
+3. Add environment variables manually (see next section).
+4. Deploy. Preview URLs get a fresh deployment on each push.
+
+### Manual env vars in Vercel (exact steps)
+
+1. Open your project on [vercel.com](https://vercel.com) → **Settings** → **Environment Variables**.
+2. Click **Add** (not bulk import).
+3. Add each row separately:
+
+| Key | Example value | Environments |
+|-----|---------------|--------------|
+| `OPENAI_API_KEY` | `sk-...` from OpenAI | Production, Preview (optional) |
+| `JWT_SECRET` | 32+ char random string | Production only (optional; sign-in has storage limits on Vercel) |
+
+4. Leave **Key** exactly as shown (case-sensitive). No `VITE_` prefix needed — the client never reads these; only the Express API does.
+5. Click **Save**, then **Redeploy** the latest deployment (env changes do not apply to old builds).
+
+Reference file: [`.env.vercel.example`](.env.vercel.example) (copy values, not Clerk keys).
+
+### Troubleshooting "No environment variables were created"
+
+| Cause | What to do |
+|-------|------------|
+| Pasted Clerk keys from Clerk Dashboard | Ignore Clerk; use `OPENAI_API_KEY` / `JWT_SECRET` only |
+| Bulk import textarea empty or comments only | Add variables **one by one** with Add |
+| Duplicate key already exists | Edit the existing variable instead of re-importing |
+| `KEY=` with no value | Vercel rejects empty values |
+| Branch-scoped var, project not on Git | Link GitHub repo first, or remove branch scope |
+
+### What works on Vercel
+
+| Feature | On Vercel |
+|---------|-----------|
+| Dashboard, HWPL, compass | Yes (static SPA) |
+| Voice dump (not signed in) | Yes — data stays in browser `localStorage` |
+| Voice dump parsing | Yes — needs `OPENAI_API_KEY` for AI mode |
+| Example companies | Yes — served from bundled JSON |
+| Sign-in / cloud save | **Limited** — see below |
+
+### Storage caveat
+
+Vercel serverless functions use an **ephemeral filesystem**. User accounts and saved applications written to `data/` **do not persist** across deployments or function cold starts. For production cloud save, use external storage (e.g. Vercel Postgres, KV, or Blob) — not included in V0.
+
+**Recommended for Vercel:** use the app without signing in; your job data lives in the browser. Sign-in is best kept for local/self-hosted runs.
+
 ## Data & privacy
 
 | Mode | Where your data lives |
