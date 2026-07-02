@@ -7,15 +7,28 @@
 }
 
 :root {
-  --bg: #0a0a12;
-  --surface: rgba(255, 255, 255, 0.04);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-elevated: rgba(18, 18, 28, 0.85);
-  --surface-hover: rgba(255, 255, 255, 0.07);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --text: #f4f4f8;
-  --text-muted: #9ca3b8;
+  --bg: #070012;
+  --bg-warm: #12001f;
+  --surface: rgba(255, 0, 110, 0.05);
+  --surface-2: rgba(0, 245, 212, 0.06);
+  --surface-elevated: rgba(14, 0, 32, 0.92);
+  --surface-hover: rgba(255, 214, 10, 0.08);
+  --border: rgba(255, 0, 110, 0.14);
+  --border-subtle: rgba(0, 245, 212, 0.08);
+  --text: #fff5f8;
+  --text-muted: #c4a8d4;
+  --accent-magenta: #ff006e;
+  --accent-cyan: #00f5d4;
+  --accent-yellow: #ffd60a;
+  --accent-coral: #ff5e5b;
+  --accent-violet: #8338ec;
+  --accent-lime: #00f5a0;
+  --gradient-primary: linear-gradient(135deg, #ff006e, #8338ec, #00f5d4);
+  --gradient-warm: linear-gradient(135deg, #ff5e5b, #ff006e, #ffd60a);
+  --gradient-thrill: linear-gradient(135deg, #8338ec 0%, #ff006e 45%, #ffd60a 100%);
+  --glow-magenta: #ff006e44;
+  --glow-cyan: #00f5d433;
+  --glow-yellow: #ffd60a22;
   --font: 'DM Sans', system-ui, sans-serif;
   --font-display: 'Space Grotesk', system-ui, sans-serif;
   --section-gap: 2.75rem;
@@ -34,7 +47,10 @@ body,
 
 body {
   font-family: var(--font);
-  background: var(--bg);
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, color-mix(in srgb, var(--accent-violet) 18%, transparent), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 50%, color-mix(in srgb, var(--accent-magenta) 10%, transparent), transparent),
+    var(--bg);
   color: var(--text);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
