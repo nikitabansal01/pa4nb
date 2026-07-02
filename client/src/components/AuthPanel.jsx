@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { LogIn, LogOut, UserPlus, X } from 'lucide-react';
 import { useAuth } from '../hooks';
 import { getLocalApplications, stripExamples } from '../storage';
@@ -60,7 +61,7 @@ export default function AuthPanel() {
         Create account
       </button>
 
-      {open && (
+      {open && createPortal(
         <div className="auth-modal-backdrop" onClick={() => setOpen(false)}>
           <div className="auth-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-labelledby="auth-title">
             <div className="auth-modal__header">
@@ -116,7 +117,8 @@ export default function AuthPanel() {
               </button>
             </p>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
