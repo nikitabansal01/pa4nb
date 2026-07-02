@@ -1,8 +1,6 @@
-import { useState, useEffect, useCallback, createContext, useContext } from 'react';
+import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
+import { useState, useEffect, useCallback } from 'react';
 import {
-  getToken,
-  setAuth,
-  getStoredUser,
   getLocalApplications,
   saveLocalApplications,
   getLocalMeta,
@@ -11,113 +9,37 @@ import {
   authHeaders,
   getLocalLifeDesign,
   saveLocalLifeDesign,
+  stripExamples,
 } from './storage';
 import { DEFAULT_LIFE_DESIGN, normalizeLifeDesign } from './lifeDesign';
 
 const API = '/api';
 
-const AuthContext = createContext(null);
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(getStoredUser);
-  const [token, setToken] = useState(getToken);
-  const [authLoading, setAuthLoading] = useState(Boolean(getToken()));
-
-  const signOut = useCallback(() => {
-    setAuth(null, null);
-    setUser(null);
-    setToken(null);
-  }, []);
-
-  const refreshSession = useCallback(async () => {
-    const currentToken = getToken();
-    if (!currentToken) {
-      setAuthLoading(false);
-      return null;
-    }
-
-    try {
-      const res = await fetch(`${API}/auth/me`, {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
-      if (!res.ok) throw new Error('Session expired');
-      const data = await res.json();
-      setUser(data.user);
-      setToken(currentToken);
-      return data;
-    } catch {
-      signOut();
-      return null;
-    } finally {
-      setAuthLoading(false);
-    }
-  }, [signOut]);
-
-  useEffect(() => {
-    if (token) refreshSession();
-    else setAuthLoading(false);
-  }, [token, refreshSession]);
-
-  const register = async (email, password, localApplications) => {
-    const res = await fetch(`${API}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, localApplications }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Registration failed');
-
-    setAuth(data.token, data.user);
-    setUser(data.user);
-    setToken(data.token);
-    clearLocalData();
-    setLocalMeta({ dataSource: 'account' });
-    return data;
-  };
-
-  const login = async (email, password, localApplications) => {
-    const res = await fetch(`${API}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, localApplications }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-
-    setAuth(data.token, data.user);
-    setUser(data.user);
-    setToken(data.token);
-    clearLocalData();
-    setLocalMeta({ dataSource: 'account' });
-    return data;
-  };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: Boolean(user && token),
-        authLoading,
-        register,
-        login,
-        signOut,
-        refreshSession,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
-
 export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
+  const { isSignedIn, isLoaded, getToken, signOut } = useClerkAuth();
+  const { user: clerkUser } = useUser();
+
+  const user = clerkUser
+    ? {
+        id: clerkUser.id,
+        email:
+          clerkUser.primaryEmailAddress?.emailAddress
+          || clerkUser.emailAddresses?.[0]?.emailAddress
+          || '',
+      }
+    : null;
+
+  return {
+    user,
+    isAuthenticated: Boolean(isSignedIn),
+    authLoading: !isLoaded,
+    getToken,
+    signOut,
+  };
 }
 
 export function useApplications() {
-  const { isAuthenticated, authLoading, token } = useAuth();
+  const { isAuthenticated, authLoading, getToken } = useAuth();
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -140,7 +62,30 @@ export function useApplications() {
     try {
       setError(null);
 
-      if (isAuthenticated && token) {
+      if (isAuthenticated && getToken) {
+        const token = await getToken();
+        if (!token) throw new Error('Failed to get sign-in token');
+
+        const local = getLocalApplications();
+        const toMigrate = local ? stripExamples(local) : [];
+
+        if (toMigrate.length > 0) {
+          const syncRes = await fetch(`${API}/auth/sync`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ localApplications: toMigrate }),
+          });
+          if (!syncRes.ok) {
+            const data = await syncRes.json().catch(() => ({}));
+            throw new Error(data.error || 'Failed to sync local data to your account');
+          }
+          clearLocalData();
+          setLocalMeta({ dataSource: 'account' });
+        }
+
         const res = await fetch(`${API}/applications`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -184,7 +129,7 @@ export function useApplications() {
     } finally {
       setLoading(false);
     }
-  }, [authLoading, isAuthenticated, token, loadExamples]);
+  }, [authLoading, isAuthenticated, getToken, loadExamples]);
 
   useEffect(() => {
     refresh();
@@ -204,7 +149,7 @@ export function useApplications() {
 
     const res = await fetch(`${API}/voice-dump`, {
       method: 'POST',
-      headers: authHeaders(),
+      headers: await authHeaders(getToken),
       body: JSON.stringify({ transcript, existingApplications: existing }),
     });
     if (!res.ok) throw new Error('Failed to process voice dump');
@@ -224,7 +169,7 @@ export function useApplications() {
     if (isAuthenticated) {
       const res = await fetch(`${API}/applications/${id}`, {
         method: 'PUT',
-        headers: authHeaders(),
+        headers: await authHeaders(getToken),
         body: JSON.stringify(updates),
       });
       if (!res.ok) throw new Error('Failed to update application');

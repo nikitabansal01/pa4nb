@@ -11,12 +11,11 @@
     "install-all": "npm install && cd client && npm install"
   },
   "dependencies": {
-    "bcryptjs": "^3.0.3",
+    "@clerk/express": "^2.1.35",
+    "@vercel/kv": "^3.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.3",
-    "lowdb": "^7.0.1",
     "openai": "^4.77.0",
     "uuid": "^11.0.3"
   },

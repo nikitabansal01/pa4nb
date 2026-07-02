@@ -1,38 +1,19 @@
-import { readFile, writeFile, mkdir } from 'fs/promises';
+import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { JSONFilePreset } from 'lowdb/node';
+import { readUserApplications, writeUserApplications } from './store.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const USERS_DATA_DIR = join(__dirname, '..', 'data', 'accounts');
-
-const dbCache = new Map();
-
-function userDbPath(userId) {
-  return join(USERS_DATA_DIR, userId, 'db.json');
-}
-
-async function getUserDb(userId) {
-  if (!dbCache.has(userId)) {
-    await mkdir(join(USERS_DATA_DIR, userId), { recursive: true });
-    const db = await JSONFilePreset(userDbPath(userId), { applications: [] });
-    dbCache.set(userId, db);
-  }
-  return dbCache.get(userId);
-}
 
 export async function getUserApplications(userId) {
-  const db = await getUserDb(userId);
-  await db.read();
-  return db.data.applications.sort(
+  const applications = await readUserApplications(userId);
+  return applications.sort(
     (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
   );
 }
 
 export async function saveUserApplications(userId, applications) {
-  const db = await getUserDb(userId);
-  db.data.applications = applications;
-  await db.write();
+  await writeUserApplications(userId, applications);
 }
 
 export async function migrateUserApplications(userId, incomingApps) {

@@ -224,6 +224,11 @@
   font-weight: 600;
 }
 
+.clerk-user-avatar {
+  width: 2rem;
+  height: 2rem;
+}
+
 /* Data source banners */
 .data-banner {
   display: flex;

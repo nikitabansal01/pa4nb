@@ -1,16 +1,17 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import { clerkMiddleware } from '@clerk/express';
 import { readFile, rename } from 'fs/promises';
 import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
-import { registerUser, loginUser, signToken } from './auth.js';
 import { getUserApplications, saveUserApplications, migrateUserApplications, loadExampleData } from './userDb.js';
 import { optionalAuth, requireAuth } from './middleware.js';
 import { parseVoiceDump, applyVoiceDumpResult } from './parser.js';
 import { DEFAULT_APPLICATION, STATUSES, INDUSTRIES, BUSINESS_MODELS, FUNDING_STAGES } from './constants.js';
+import { getStorageMode } from './store.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -19,17 +20,18 @@ const LEGACY_DB = join(__dirname, '..', 'db.json');
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
+app.use(clerkMiddleware());
 
 app.get('/', (_req, res) => {
   res.json({
     name: 'Job Hunt Assistant API',
     status: 'ok',
     ui: 'http://localhost:5173',
-    storage: 'Local browser storage by default; optional sign-in for cloud save',
+    storage: 'Local browser storage by default; optional Clerk sign-in for cloud save',
     endpoints: {
       health: '/api/health',
       examples: '/api/examples',
-      auth: 'POST /api/auth/register | /api/auth/login',
+      auth: 'POST /api/auth/sync | GET /api/auth/me',
       applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
       voiceDump: 'POST /api/voice-dump',
       meta: '/api/meta',
@@ -38,10 +40,12 @@ app.get('/', (_req, res) => {
 });
 
 app.get('/api/health', (_req, res) => {
+  const storage = getStorageMode();
   res.json({
     ok: true,
     aiEnabled: Boolean(process.env.OPENAI_API_KEY),
-    authEnabled: true,
+    authEnabled: Boolean(process.env.CLERK_SECRET_KEY),
+    storage,
   });
 });
 
@@ -71,38 +75,20 @@ app.get('/api/legacy/import', async (_req, res) => {
   }
 });
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/sync', requireAuth, async (req, res) => {
   try {
-    const { email, password, localApplications } = req.body;
-    const user = await registerUser(email, password);
-    const token = signToken(user);
+    const { localApplications } = req.body;
+    let applications;
 
     if (Array.isArray(localApplications) && localApplications.length > 0) {
-      const applications = await migrateUserApplications(user.id, localApplications);
-      return res.status(201).json({ token, user, applications });
+      applications = await migrateUserApplications(req.user.id, localApplications);
+    } else {
+      applications = await getUserApplications(req.user.id);
     }
 
-    res.status(201).json({ token, user, applications: [] });
+    res.json({ user: req.user, applications });
   } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/login', async (req, res) => {
-  try {
-    const { email, password, localApplications } = req.body;
-    const user = await loginUser(email, password);
-    const token = signToken(user);
-
-    if (Array.isArray(localApplications) && localApplications.length > 0) {
-      const applications = await migrateUserApplications(user.id, localApplications);
-      return res.json({ token, user, applications });
-    }
-
-    const applications = await getUserApplications(user.id);
-    res.json({ token, user, applications });
-  } catch (error) {
-    res.status(401).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -208,6 +194,10 @@ if (isMainModule) {
         ? 'AI parsing: enabled (OpenAI)'
         : 'AI parsing: heuristic mode (set OPENAI_API_KEY for smarter parsing)'
     );
-    console.log('Storage: local browser by default; sign-in saves to your account');
+    console.log(
+      process.env.CLERK_SECRET_KEY
+        ? 'Auth: Clerk enabled'
+        : 'Auth: set CLERK_SECRET_KEY for sign-in'
+    );
   });
 }

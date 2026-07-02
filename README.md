@@ -37,7 +37,8 @@ PA for NB
 
 ```bash
 npm run install-all
-cp .env.example .env   # optional: OpenAI key + JWT secret
+cp .env.example .env
+cp client/.env.example client/.env.local   # Clerk publishable key
 npm run dev
 ```
 
@@ -52,46 +53,24 @@ The app is configured for Vercel: the Vite client builds to static files, and th
 
 In Cursor, install the Vercel agent plugin with **`/add-plugin vercel`** (or use the plugin marketplace). The CLI command `npx plugins add vercel/vercel-plugin` is for Claude Code / Codex environments.
 
-### This app does **not** use Clerk
+### Authentication (Clerk)
 
-Sign-in is **custom JWT + bcrypt** (`server/auth.js`), not [Clerk](https://clerk.com). Do **not** add `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, or `VITE_CLERK_*` — the code never reads them.
+Sign-in uses [Clerk](https://clerk.com). Connect Clerk to your Vercel project (Integrations → Clerk), or add keys manually:
 
-If Vercel shows a red error **"No environment variables were created"**, you are usually:
+| Key | Where | Environments |
+|-----|-------|--------------|
+| `CLERK_SECRET_KEY` | Server API | Production, Preview, Development |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Client (Vite reads this name) | Production, Preview, Development |
+| `OPENAI_API_KEY` | Server API (optional) | Production, Preview |
 
-- Pasting Clerk’s env block (wrong product — nothing will wire up), or
-- Using **bulk import** with an empty field, comments-only text, or duplicate keys that already exist, or
-- Importing branch-scoped vars on a project **not linked to Git**
+Local dev: set `CLERK_SECRET_KEY` in `.env` and `VITE_CLERK_PUBLISHABLE_KEY` in `client/.env.local`.
 
-**Fix:** add the variables below **one at a time** in the dashboard (see manual steps).
-
-### Deploy steps
-
-1. Push the repo to GitHub (if not already).
-2. Import the project in [Vercel](https://vercel.com/new) — root directory stays `.` (Vercel reads `vercel.json`).
-3. Add environment variables manually (see next section).
-4. Deploy. Preview URLs get a fresh deployment on each push.
-
-### Manual env vars in Vercel (exact steps)
-
-1. Open your project on [vercel.com](https://vercel.com) → **Settings** → **Environment Variables**.
-2. Click **Add** (not bulk import).
-3. Add each row separately:
-
-| Key | Example value | Environments |
-|-----|---------------|--------------|
-| `OPENAI_API_KEY` | `sk-...` from OpenAI | Production, Preview (optional) |
-| `JWT_SECRET` | 32+ char random string | Production only (optional; sign-in has storage limits on Vercel) |
-
-4. Leave **Key** exactly as shown (case-sensitive). No `VITE_` prefix needed — the client never reads these; only the Express API does.
-5. Click **Save**, then **Redeploy** the latest deployment (env changes do not apply to old builds).
-
-Reference file: [`.env.vercel.example`](.env.vercel.example) (copy values, not Clerk keys).
+Reference: [`.env.vercel.example`](.env.vercel.example)
 
 ### Troubleshooting "No environment variables were created"
 
 | Cause | What to do |
 |-------|------------|
-| Pasted Clerk keys from Clerk Dashboard | Ignore Clerk; use `OPENAI_API_KEY` / `JWT_SECRET` only |
 | Bulk import textarea empty or comments only | Add variables **one by one** with Add |
 | Duplicate key already exists | Edit the existing variable instead of re-importing |
 | `KEY=` with no value | Vercel rejects empty values |
@@ -105,20 +84,25 @@ Reference file: [`.env.vercel.example`](.env.vercel.example) (copy values, not C
 | Voice dump (not signed in) | Yes — data stays in browser `localStorage` |
 | Voice dump parsing | Yes — needs `OPENAI_API_KEY` for AI mode |
 | Example companies | Yes — served from bundled JSON |
-| Sign-in / cloud save | **Limited** — see below |
+| Sign-in / cloud save | Yes — **Clerk** for auth; **KV** (optional) for saved applications on Vercel |
 
-### Storage caveat
+### Cloud save on Vercel
 
-Vercel serverless functions use an **ephemeral filesystem**. User accounts and saved applications written to `data/` **do not persist** across deployments or function cold starts. For production cloud save, use external storage (e.g. Vercel Postgres, KV, or Blob) — not included in V0.
+Clerk handles sign-in. Saved job applications still need writable storage on Vercel:
 
-**Recommended for Vercel:** use the app without signing in; your job data lives in the browser. Sign-in is best kept for local/self-hosted runs.
+1. **Storage** → **Create Database** → **KV** (or Upstash Redis)
+2. Connect to this project (`KV_REST_API_URL`, `KV_REST_API_TOKEN` are set automatically)
+3. Redeploy
+
+Without KV, sign-in works but saving applications to your account fails on Vercel. Local `npm run dev` uses the `data/` folder on disk.
 
 ## Data & privacy
 
 | Mode | Where your data lives |
 |------|----------------------|
 | **Not signed in** | Browser `localStorage` on your machine only |
-| **Signed in** | Server `data/accounts/<your-id>/` (gitignored, never in the repo) |
+| **Signed in (local)** | Server `data/accounts/<your-id>/` (gitignored, never in the repo) |
+| **Signed in (Vercel)** | Vercel KV database linked to your project |
 | **First visit** | Fictional **example** companies from `server/example-data.json` |
 
 Your real job applications are **never committed to GitHub**. The repo only ships dummy example data.
@@ -153,7 +137,7 @@ Without a key, the app uses a basic heuristic parser (still works, just less acc
 
 - **Frontend**: React + Vite + localStorage
 - **Backend**: Express + per-user JSON storage (when signed in)
-- **Auth**: JWT + bcrypt (optional)
+- **Auth**: Clerk (optional sign-in)
 - **Voice**: Web Speech API (Chrome/Safari)
 - **Parsing**: OpenAI GPT-4o-mini (optional) with heuristic fallback
 
@@ -163,8 +147,9 @@ Without a key, the app uses a basic heuristic parser (still works, just less acc
 pa-for-nb/
 ├── server/
 │   ├── example-data.json   # Fictional demo data (committed)
-│   ├── auth.js             # Optional sign-in
-│   └── userDb.js           # Per-account storage
+│   ├── middleware.js       # Clerk token verification
+│   ├── store.js            # Per-user application storage
+│   └── userDb.js           # Application CRUD helpers
 ├── client/                 # React dashboard
 ├── data/                   # User accounts (gitignored, local only)
 └── .env                    # API keys (gitignored)
