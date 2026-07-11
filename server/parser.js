@@ -72,6 +72,7 @@ function mergeApplication(existing, incoming) {
     nextSteps: incoming.nextSteps?.length ? incoming.nextSteps : base.nextSteps || [],
     needsFollowUp: incoming.needsFollowUp ?? base.needsFollowUp,
     needsPrep: incoming.needsPrep ?? base.needsPrep,
+    labelIds: Array.isArray(incoming.labelIds) ? incoming.labelIds : (base.labelIds || []),
     notes: [base.notes, incoming.notes].filter(Boolean).join('\n').trim(),
     updatedAt: new Date().toISOString(),
     isExample: false,

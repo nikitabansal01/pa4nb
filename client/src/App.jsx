@@ -23,12 +23,16 @@ export default function App() {
   const { isAuthenticated } = useAuth();
   const {
     applications,
+    labels,
     loading,
     error,
     dataSource,
     refresh,
     submitVoiceDump,
     updateApplication,
+    createLabel,
+    updateLabel,
+    deleteLabel,
     clearExamples,
     resetToExamples,
     syncToAccount,
@@ -115,11 +119,15 @@ export default function App() {
 
   const jobTrackerProps = {
     applications,
+    labels,
     loading,
     error,
     dataSource,
     isAuthenticated,
     onUpdateApplication: updateApplication,
+    onCreateLabel: createLabel,
+    onUpdateLabel: updateLabel,
+    onDeleteLabel: deleteLabel,
     onClearExamples: clearExamples,
     onResetExamples: resetToExamples,
     onSyncToAccount: handleSyncToAccount,

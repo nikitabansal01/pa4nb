@@ -62,10 +62,14 @@ async function ensureSchema() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    ALTER TABLE user_applications
+    ADD COLUMN IF NOT EXISTS labels JSONB NOT NULL DEFAULT '[]'::jsonb
+  `;
   schemaReady = true;
 }
 
-function parseApplications(raw) {
+function parseJsonArray(raw) {
   if (!raw) return [];
   if (typeof raw === 'string') {
     try {
@@ -76,6 +80,32 @@ function parseApplications(raw) {
     }
   }
   return Array.isArray(raw) ? raw : [];
+}
+
+async function readFilesystemUserData(userId) {
+  const userDir = join(USERS_DATA_DIR, userId);
+  await mkdir(userDir, { recursive: true });
+  const dbPath = join(userDir, 'db.json');
+  try {
+    const raw = await readFile(dbPath, 'utf8');
+    const data = JSON.parse(raw);
+    return {
+      applications: Array.isArray(data.applications) ? data.applications : [],
+      labels: Array.isArray(data.labels) ? data.labels : [],
+    };
+  } catch {
+    return { applications: [], labels: [] };
+  }
+}
+
+async function writeFilesystemUserData(userId, { applications, labels }) {
+  const userDir = join(USERS_DATA_DIR, userId);
+  await mkdir(userDir, { recursive: true });
+  const dbPath = join(userDir, 'db.json');
+  await writeFile(
+    dbPath,
+    JSON.stringify({ applications, labels }, null, 2)
+  );
 }
 
 export async function readUserApplications(userId) {
@@ -90,19 +120,11 @@ export async function readUserApplications(userId) {
       WHERE user_id = ${userId}
       LIMIT 1
     `;
-    return parseApplications(rows[0]?.applications);
+    return parseJsonArray(rows[0]?.applications);
   }
 
-  const userDir = join(USERS_DATA_DIR, userId);
-  await mkdir(userDir, { recursive: true });
-  const dbPath = join(userDir, 'db.json');
-  try {
-    const raw = await readFile(dbPath, 'utf8');
-    const data = JSON.parse(raw);
-    return data.applications || [];
-  } catch {
-    return [];
-  }
+  const data = await readFilesystemUserData(userId);
+  return data.applications;
 }
 
 export async function writeUserApplications(userId, applications) {
@@ -115,8 +137,8 @@ export async function writeUserApplications(userId, applications) {
 
     try {
       await sql`
-        INSERT INTO user_applications (user_id, applications, updated_at)
-        VALUES (${userId}, ${payload}::jsonb, NOW())
+        INSERT INTO user_applications (user_id, applications, labels, updated_at)
+        VALUES (${userId}, ${payload}::jsonb, '[]'::jsonb, NOW())
         ON CONFLICT (user_id)
         DO UPDATE SET
           applications = EXCLUDED.applications,
@@ -132,8 +154,59 @@ export async function writeUserApplications(userId, applications) {
     return;
   }
 
-  const userDir = join(USERS_DATA_DIR, userId);
-  await mkdir(userDir, { recursive: true });
-  const dbPath = join(userDir, 'db.json');
-  await writeFile(dbPath, JSON.stringify({ applications }, null, 2));
+  const existing = await readFilesystemUserData(userId);
+  await writeFilesystemUserData(userId, {
+    applications,
+    labels: existing.labels,
+  });
+}
+
+export async function readUserLabels(userId) {
+  assertStorageReady();
+
+  if (usePostgresStorage()) {
+    await ensureSchema();
+    const sql = getSql();
+    const rows = await sql`
+      SELECT labels
+      FROM user_applications
+      WHERE user_id = ${userId}
+      LIMIT 1
+    `;
+    return parseJsonArray(rows[0]?.labels);
+  }
+
+  const data = await readFilesystemUserData(userId);
+  return data.labels;
+}
+
+export async function writeUserLabels(userId, labels) {
+  assertStorageReady();
+
+  if (usePostgresStorage()) {
+    await ensureSchema();
+    const sql = getSql();
+    const payload = JSON.stringify(labels);
+
+    try {
+      await sql`
+        INSERT INTO user_applications (user_id, applications, labels, updated_at)
+        VALUES (${userId}, '[]'::jsonb, ${payload}::jsonb, NOW())
+        ON CONFLICT (user_id)
+        DO UPDATE SET
+          labels = EXCLUDED.labels,
+          updated_at = NOW()
+      `;
+    } catch (error) {
+      console.error('Neon labels write failed:', error.message, { userId });
+      throw new Error(`Failed to save labels: ${error.message}`);
+    }
+    return;
+  }
+
+  const existing = await readFilesystemUserData(userId);
+  await writeFilesystemUserData(userId, {
+    applications: existing.applications,
+    labels,
+  });
 }

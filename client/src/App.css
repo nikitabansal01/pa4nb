@@ -448,8 +448,23 @@
   margin-top: 0.75rem;
 }
 
+.job-tracker-area__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-bottom: 0.25rem;
+}
+
 .job-tracker-area__intro {
+  flex: 1;
   margin-bottom: 0;
+  min-width: 0;
+}
+
+.job-tracker-area__settings {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
 }
 
 .job-tracker-area__intro h2 {
@@ -467,6 +482,212 @@
   font-size: 0.9rem;
   max-width: 640px;
   line-height: 1.55;
+}
+
+.labels-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 0, 10, 0.82);
+  backdrop-filter: blur(8px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.labels-overlay {
+  width: min(100%, 440px);
+  max-height: min(85vh, 560px);
+  overflow: auto;
+  background: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.labels-overlay__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.labels-overlay__header h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.labels-overlay__hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-top: 0.35rem;
+  line-height: 1.45;
+}
+
+.labels-overlay__list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.labels-overlay__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.labels-overlay__name {
+  font-size: 0.92rem;
+  font-weight: 500;
+}
+
+.labels-overlay__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.labels-overlay__icon-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.labels-overlay__icon-btn:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+  border-color: var(--border);
+}
+
+.labels-overlay__icon-btn--danger:hover {
+  color: #f87171;
+}
+
+.labels-overlay__edit,
+.labels-overlay__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+}
+
+.labels-overlay__input {
+  flex: 1;
+  min-width: 140px;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.labels-overlay__text-btn {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #c4b5fd;
+  padding: 0.4rem 0.55rem;
+}
+
+.labels-overlay__text-btn--muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.labels-overlay__text-btn:disabled {
+  opacity: 0.5;
+}
+
+.labels-overlay__add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  align-self: flex-start;
+  padding: 0.55rem 0.85rem;
+  border-radius: 10px;
+  border: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.labels-overlay__add-btn:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 35%, transparent);
+  background: var(--surface-hover);
+}
+
+.labels-overlay__empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0;
+}
+
+.labels-overlay__error {
+  width: 100%;
+  color: #f87171;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+.flag--label {
+  background: color-mix(in srgb, #38bdf8 16%, transparent);
+  color: #7dd3fc;
+}
+
+.company-table__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  min-width: 140px;
+}
+
+.company-table__label-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: transparent;
+  transition: all 0.15s;
+}
+
+.company-table__label-chip--on {
+  background: color-mix(in srgb, #38bdf8 16%, transparent);
+  color: #7dd3fc;
+  border-color: color-mix(in srgb, #38bdf8 40%, transparent);
+}
+
+.company-table__label-chip:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--text) 30%, transparent);
+}
+
+.company-table__labels-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
 .voice-compose {

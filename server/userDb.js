@@ -1,7 +1,14 @@
 import { readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { readUserApplications, writeUserApplications } from './store.js';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  readUserApplications,
+  writeUserApplications,
+  readUserLabels,
+  writeUserLabels,
+} from './store.js';
+import { DEFAULT_LABEL_NAME } from './constants.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -31,6 +38,104 @@ export async function migrateUserApplications(userId, incomingApps) {
   );
   await saveUserApplications(userId, merged);
   return merged;
+}
+
+function createDefaultLabel() {
+  const now = new Date().toISOString();
+  return {
+    id: uuidv4(),
+    name: DEFAULT_LABEL_NAME,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export async function getUserLabels(userId) {
+  let labels = await readUserLabels(userId);
+  if (!Array.isArray(labels) || labels.length === 0) {
+    labels = [createDefaultLabel()];
+    await writeUserLabels(userId, labels);
+  }
+  return labels.sort(
+    (a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)
+  );
+}
+
+export async function saveUserLabels(userId, labels) {
+  await writeUserLabels(userId, labels);
+}
+
+export async function migrateUserLabels(userId, incomingLabels) {
+  const existing = await readUserLabels(userId);
+  const map = new Map(existing.map((label) => [label.id, label]));
+
+  for (const label of incomingLabels || []) {
+    if (!label?.id || !label?.name?.trim()) continue;
+    map.set(label.id, {
+      ...map.get(label.id),
+      ...label,
+      name: label.name.trim(),
+    });
+  }
+
+  let merged = [...map.values()];
+  if (merged.length === 0) {
+    merged = [createDefaultLabel()];
+  }
+
+  merged.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  await saveUserLabels(userId, merged);
+  return merged;
+}
+
+export async function createUserLabel(userId, name) {
+  const trimmed = name?.trim();
+  if (!trimmed) throw new Error('Label name is required');
+
+  const labels = await getUserLabels(userId);
+  const now = new Date().toISOString();
+  const label = {
+    id: uuidv4(),
+    name: trimmed,
+    createdAt: now,
+    updatedAt: now,
+  };
+  labels.push(label);
+  await saveUserLabels(userId, labels);
+  return label;
+}
+
+export async function updateUserLabel(userId, labelId, name) {
+  const trimmed = name?.trim();
+  if (!trimmed) throw new Error('Label name is required');
+
+  const labels = await getUserLabels(userId);
+  const index = labels.findIndex((l) => l.id === labelId);
+  if (index === -1) return null;
+
+  labels[index] = {
+    ...labels[index],
+    name: trimmed,
+    updatedAt: new Date().toISOString(),
+  };
+  await saveUserLabels(userId, labels);
+  return labels[index];
+}
+
+export async function deleteUserLabel(userId, labelId) {
+  const labels = await getUserLabels(userId);
+  const filtered = labels.filter((l) => l.id !== labelId);
+  if (filtered.length === labels.length) return false;
+
+  await saveUserLabels(userId, filtered);
+
+  const applications = await getUserApplications(userId);
+  const nextApps = applications.map((app) => ({
+    ...app,
+    labelIds: (app.labelIds || []).filter((id) => id !== labelId),
+  }));
+  await saveUserApplications(userId, nextApps);
+  return true;
 }
 
 export async function loadExampleData() {

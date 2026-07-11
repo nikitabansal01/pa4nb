@@ -73,6 +73,9 @@ export const DEFAULT_APPLICATION = {
   nextSteps: [],
   needsFollowUp: false,
   needsPrep: false,
+  labelIds: [],
   notes: '',
   isExample: false,
 };
+
+export const DEFAULT_LABEL_NAME = 'Referral requested';

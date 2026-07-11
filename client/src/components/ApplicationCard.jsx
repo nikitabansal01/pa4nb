@@ -1,4 +1,4 @@
-import { Calendar, Building2, Briefcase, DollarSign, ArrowRight, Bell, BookOpen } from 'lucide-react';
+import { Calendar, Building2, Briefcase, DollarSign, ArrowRight, Bell, BookOpen, Tag } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS, PIPELINE_MILESTONES, formatDate, relativeTime } from '../constants';
 
 function Pipeline({ status }) {
@@ -38,8 +38,9 @@ function Pipeline({ status }) {
   );
 }
 
-export default function ApplicationCard({ app }) {
+export default function ApplicationCard({ app, labels = [] }) {
   const statusColor = STATUS_COLORS[app.status] || '#6B7280';
+  const attachedLabels = labels.filter((label) => (app.labelIds || []).includes(label.id));
 
   return (
     <article className="app-card" style={{ '--accent': statusColor }}>
@@ -84,7 +85,7 @@ export default function ApplicationCard({ app }) {
         )}
       </div>
 
-      {(app.needsFollowUp || app.needsPrep) && (
+      {(app.needsFollowUp || app.needsPrep || attachedLabels.length > 0) && (
         <div className="app-card__flags">
           {app.needsFollowUp && (
             <span className="flag flag--followup">
@@ -96,6 +97,12 @@ export default function ApplicationCard({ app }) {
               <BookOpen size={13} /> Needs prep
             </span>
           )}
+          {attachedLabels.map((label) => (
+            <span key={label.id} className="flag flag--label">
+              <Tag size={13} />
+              {label.name}
+            </span>
+          ))}
         </div>
       )}
 

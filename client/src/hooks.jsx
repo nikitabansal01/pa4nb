@@ -3,6 +3,9 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   getLocalApplications,
   saveLocalApplications,
+  getLocalLabels,
+  saveLocalLabels,
+  ensureLocalLabels,
   getLocalMeta,
   setLocalMeta,
   clearLocalData,
@@ -42,6 +45,7 @@ export function useAuth() {
 export function useApplications() {
   const { isAuthenticated, authLoading, getToken } = useAuth();
   const [applications, setApplications] = useState([]);
+  const [labels, setLabels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [dataSource, setDataSource] = useState(null);
@@ -51,8 +55,10 @@ export function useApplications() {
     if (!res.ok) throw new Error('Failed to load examples');
     const data = await res.json();
     saveLocalApplications(data.applications);
+    const seededLabels = ensureLocalLabels();
     setLocalMeta({ dataSource: 'examples' });
     setApplications(data.applications);
+    setLabels(seededLabels);
     setDataSource('examples');
     return data.applications;
   }, []);
@@ -62,6 +68,7 @@ export function useApplications() {
     const real = local ? stripExamples(local) : [];
     if (real.length === 0) return null;
     setApplications(real);
+    setLabels(ensureLocalLabels());
     setDataSource('local');
     return real;
   };
@@ -74,13 +81,17 @@ export function useApplications() {
     const token = await getToken();
     if (!token) throw new Error('Sign-in session expired. Sign out and sign in again.');
 
+    const localLabels = getLocalLabels() || [];
     const res = await fetch(`${API}/auth/sync`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ localApplications: stripExamples(apps) }),
+      body: JSON.stringify({
+        localApplications: stripExamples(apps),
+        localLabels,
+      }),
     });
 
     const data = await res.json().catch(() => ({}));
@@ -91,6 +102,7 @@ export function useApplications() {
     clearLocalData();
     setLocalMeta({ dataSource: 'account' });
     setApplications(data.applications);
+    setLabels(Array.isArray(data.labels) ? data.labels : []);
     setDataSource('account');
     return data.applications;
   }, [isAuthenticated, getToken]);
@@ -107,15 +119,19 @@ export function useApplications() {
 
         const local = getLocalApplications();
         const toMigrate = local ? stripExamples(local) : [];
+        const localLabels = getLocalLabels() || [];
 
-        if (toMigrate.length > 0) {
+        if (toMigrate.length > 0 || localLabels.length > 0) {
           const syncRes = await fetch(`${API}/auth/sync`, {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ localApplications: toMigrate }),
+            body: JSON.stringify({
+              localApplications: toMigrate,
+              localLabels,
+            }),
           });
           if (!syncRes.ok) {
             const data = await syncRes.json().catch(() => ({}));
@@ -128,15 +144,23 @@ export function useApplications() {
             }
             throw new Error(data.error || 'Failed to sync local data to your account');
           }
+          const syncData = await syncRes.json().catch(() => ({}));
           clearLocalData();
           setLocalMeta({ dataSource: 'account' });
+          if (Array.isArray(syncData.labels)) setLabels(syncData.labels);
         }
 
-        const res = await fetch(`${API}/applications`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
+        const [appsRes, labelsRes] = await Promise.all([
+          fetch(`${API}/applications`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API}/labels`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (!appsRes.ok) {
+          const data = await appsRes.json().catch(() => ({}));
           if (isStorageError(data.error)) {
             const fallback = loadLocalRealApps();
             if (fallback) {
@@ -146,7 +170,13 @@ export function useApplications() {
           }
           throw new Error(data.error || 'Failed to load your saved applications');
         }
-        const data = await res.json();
+
+        const data = await appsRes.json();
+        if (labelsRes.ok) {
+          const labelsData = await labelsRes.json();
+          setLabels(Array.isArray(labelsData) ? labelsData : []);
+        }
+
         const remainingLocal = getLocalApplications();
         const localReal = remainingLocal ? stripExamples(remainingLocal) : [];
 
@@ -162,6 +192,7 @@ export function useApplications() {
 
       const local = getLocalApplications();
       const meta = getLocalMeta();
+      setLabels(ensureLocalLabels());
 
       if (local && local.length > 0) {
         setApplications(local);
@@ -204,6 +235,11 @@ export function useApplications() {
     setLocalMeta({ dataSource: apps.length ? 'local' : 'empty' });
     setDataSource(apps.length ? 'local' : 'empty');
     setApplications(apps);
+  };
+
+  const persistLocalLabels = (nextLabels) => {
+    saveLocalLabels(nextLabels);
+    setLabels(nextLabels);
   };
 
   const submitVoiceDump = async (transcript) => {
@@ -279,10 +315,89 @@ export function useApplications() {
     return next.find((a) => a.id === id);
   };
 
+  const createLabel = async (name) => {
+    const trimmed = name?.trim();
+    if (!trimmed) throw new Error('Label name is required');
+
+    if (isAuthenticated) {
+      const res = await fetch(`${API}/labels`, {
+        method: 'POST',
+        headers: await authHeaders(getToken),
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to create label');
+      setLabels((prev) => [...prev, data]);
+      return data;
+    }
+
+    const now = new Date().toISOString();
+    const label = {
+      id: `label-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+      name: trimmed,
+      createdAt: now,
+      updatedAt: now,
+    };
+    persistLocalLabels([...labels, label]);
+    return label;
+  };
+
+  const updateLabel = async (id, name) => {
+    const trimmed = name?.trim();
+    if (!trimmed) throw new Error('Label name is required');
+
+    if (isAuthenticated) {
+      const res = await fetch(`${API}/labels/${id}`, {
+        method: 'PUT',
+        headers: await authHeaders(getToken),
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to update label');
+      setLabels((prev) => prev.map((l) => (l.id === id ? data : l)));
+      return data;
+    }
+
+    const next = labels.map((l) =>
+      l.id === id ? { ...l, name: trimmed, updatedAt: new Date().toISOString() } : l
+    );
+    persistLocalLabels(next);
+    return next.find((l) => l.id === id);
+  };
+
+  const deleteLabel = async (id) => {
+    if (isAuthenticated) {
+      const res = await fetch(`${API}/labels/${id}`, {
+        method: 'DELETE',
+        headers: await authHeaders(getToken),
+      });
+      if (!res.ok && res.status !== 204) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to delete label');
+      }
+      setLabels((prev) => prev.filter((l) => l.id !== id));
+      setApplications((prev) =>
+        prev.map((app) => ({
+          ...app,
+          labelIds: (app.labelIds || []).filter((labelId) => labelId !== id),
+        }))
+      );
+      return;
+    }
+
+    persistLocalLabels(labels.filter((l) => l.id !== id));
+    const nextApps = applications.map((app) => ({
+      ...app,
+      labelIds: (app.labelIds || []).filter((labelId) => labelId !== id),
+    }));
+    persistLocal(nextApps);
+  };
+
   const clearExamples = async () => {
     if (isAuthenticated) return;
     clearLocalData();
     setApplications([]);
+    setLabels(ensureLocalLabels());
     setDataSource('empty');
   };
 
@@ -293,12 +408,16 @@ export function useApplications() {
 
   return {
     applications,
+    labels,
     loading: loading || authLoading,
     error,
     dataSource,
     refresh,
     submitVoiceDump,
     updateApplication,
+    createLabel,
+    updateLabel,
+    deleteLabel,
     clearExamples,
     resetToExamples,
     syncToAccount,

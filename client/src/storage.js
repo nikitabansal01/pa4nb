@@ -1,6 +1,9 @@
 const STORAGE_KEY = 'pa-for-nb-applications';
+const LABELS_KEY = 'pa-for-nb-labels';
 const LIFE_DESIGN_KEY = 'pa-for-nb-life-design';
 const META_KEY = 'pa-for-nb-meta';
+
+export const DEFAULT_LABEL_NAME = 'Referral requested';
 
 export function getLocalApplications() {
   const raw = localStorage.getItem(STORAGE_KEY);
@@ -14,6 +17,39 @@ export function getLocalApplications() {
 
 export function saveLocalApplications(applications) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
+}
+
+export function getLocalLabels() {
+  const raw = localStorage.getItem(LABELS_KEY);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveLocalLabels(labels) {
+  localStorage.setItem(LABELS_KEY, JSON.stringify(labels));
+}
+
+export function createDefaultLocalLabel() {
+  const now = new Date().toISOString();
+  return {
+    id: `label-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    name: DEFAULT_LABEL_NAME,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export function ensureLocalLabels() {
+  const existing = getLocalLabels();
+  if (existing && existing.length > 0) return existing;
+  const seeded = [createDefaultLocalLabel()];
+  saveLocalLabels(seeded);
+  return seeded;
 }
 
 export function getLocalMeta() {
@@ -46,6 +82,7 @@ export function saveLocalLifeDesign(data) {
 
 export function clearLocalData() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(LABELS_KEY);
   localStorage.setItem(META_KEY, JSON.stringify({ dataSource: 'empty' }));
 }
 

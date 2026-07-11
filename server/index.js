@@ -8,7 +8,17 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { v4 as uuidv4 } from 'uuid';
-import { getUserApplications, saveUserApplications, migrateUserApplications, loadExampleData } from './userDb.js';
+import {
+  getUserApplications,
+  saveUserApplications,
+  migrateUserApplications,
+  loadExampleData,
+  getUserLabels,
+  migrateUserLabels,
+  createUserLabel,
+  updateUserLabel,
+  deleteUserLabel,
+} from './userDb.js';
 import { optionalAuth, requireAuth } from './middleware.js';
 import { parseVoiceDump, applyVoiceDumpResult } from './parser.js';
 import { mergeApplicationLists, stripExamples } from './applicationsMerge.js';
@@ -37,6 +47,7 @@ app.get('/', (_req, res) => {
       examples: '/api/examples',
       auth: 'POST /api/auth/sync | GET /api/auth/me',
       applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
+      labels: 'GET/POST/PUT/DELETE /api/labels (auth required)',
       voiceDump: 'POST /api/voice-dump',
       meta: '/api/meta',
     },
@@ -81,8 +92,9 @@ app.get('/api/legacy/import', async (_req, res) => {
 
 app.post('/api/auth/sync', requireAuth, async (req, res) => {
   try {
-    const { localApplications } = req.body;
+    const { localApplications, localLabels } = req.body;
     let applications;
+    let labels;
 
     if (Array.isArray(localApplications) && localApplications.length > 0) {
       applications = await migrateUserApplications(req.user.id, localApplications);
@@ -90,7 +102,13 @@ app.post('/api/auth/sync', requireAuth, async (req, res) => {
       applications = await getUserApplications(req.user.id);
     }
 
-    res.json({ user: req.user, applications });
+    if (Array.isArray(localLabels) && localLabels.length > 0) {
+      labels = await migrateUserLabels(req.user.id, localLabels);
+    } else {
+      labels = await getUserLabels(req.user.id);
+    }
+
+    res.json({ user: req.user, applications, labels });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -98,7 +116,8 @@ app.post('/api/auth/sync', requireAuth, async (req, res) => {
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   const applications = await getUserApplications(req.user.id);
-  res.json({ user: req.user, applications });
+  const labels = await getUserLabels(req.user.id);
+  res.json({ user: req.user, applications, labels });
 });
 
 app.get('/api/applications', requireAuth, async (req, res) => {
@@ -145,6 +164,44 @@ app.delete('/api/applications/:id', requireAuth, async (req, res) => {
   }
   await saveUserApplications(req.user.id, filtered);
   res.status(204).end();
+});
+
+app.get('/api/labels', requireAuth, async (req, res) => {
+  try {
+    const labels = await getUserLabels(req.user.id);
+    res.json(labels);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/labels', requireAuth, async (req, res) => {
+  try {
+    const label = await createUserLabel(req.user.id, req.body?.name);
+    res.status(201).json(label);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/labels/:id', requireAuth, async (req, res) => {
+  try {
+    const label = await updateUserLabel(req.user.id, req.params.id, req.body?.name);
+    if (!label) return res.status(404).json({ error: 'Not found' });
+    res.json(label);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/labels/:id', requireAuth, async (req, res) => {
+  try {
+    const deleted = await deleteUserLabel(req.user.id, req.params.id);
+    if (!deleted) return res.status(404).json({ error: 'Not found' });
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.post('/api/voice-dump', optionalAuth, async (req, res) => {

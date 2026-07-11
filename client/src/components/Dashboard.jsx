@@ -46,7 +46,7 @@ const OVERVIEW_STATS = [
   },
 ];
 
-export default function Dashboard({ applications }) {
+export default function Dashboard({ applications, labels = [] }) {
   const active = applications.filter((a) => !['rejected', 'withdrawn'].includes(a.status));
   const closed = applications.filter((a) => ['rejected', 'withdrawn'].includes(a.status));
   const stats = getPipelineOverviewStats(applications);
@@ -103,7 +103,7 @@ export default function Dashboard({ applications }) {
               <p>Do a voice dump above to add your first one.</p>
             </div>
           ) : (
-            active.map((app) => <ApplicationCard key={app.id} app={app} />)
+            active.map((app) => <ApplicationCard key={app.id} app={app} labels={labels} />)
           )}
         </div>
       </div>
@@ -113,7 +113,7 @@ export default function Dashboard({ applications }) {
           <h3 className="dashboard__section-title">Closed</h3>
           <div className="dashboard__grid dashboard__grid--muted">
             {closed.map((app) => (
-              <ApplicationCard key={app.id} app={app} />
+              <ApplicationCard key={app.id} app={app} labels={labels} />
             ))}
           </div>
         </div>

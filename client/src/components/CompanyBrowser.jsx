@@ -36,7 +36,7 @@ const GROUP_BY_OPTIONS = [
   { value: 'status', label: 'Status' },
 ];
 
-const COLUMN_COUNT = 10;
+const COLUMN_COUNT = 11;
 
 function byRecency(a, b) {
   return new Date(b.updatedAt) - new Date(a.updatedAt);
@@ -94,10 +94,11 @@ function FilterSelect({ label, value, onChange, options, labels }) {
   );
 }
 
-function CompanyTableRow({ app, onUpdate, hideColumn }) {
+function CompanyTableRow({ app, labels, onUpdate, hideColumn }) {
   const financeStanding = getFinanceStanding(app);
   const standingColor = FINANCE_STANDING_COLORS[financeStanding];
   const statusColor = STATUS_COLORS[app.status] || '#6B7280';
+  const selectedIds = app.labelIds || [];
 
   const handleChange = (field, value) => {
     const payload = { [field]: value };
@@ -105,6 +106,13 @@ function CompanyTableRow({ app, onUpdate, hideColumn }) {
       payload.lastFundingAmount = value === '' ? null : Number(value);
     }
     onUpdate(app.id, payload);
+  };
+
+  const toggleLabel = (labelId) => {
+    const next = selectedIds.includes(labelId)
+      ? selectedIds.filter((id) => id !== labelId)
+      : [...selectedIds, labelId];
+    onUpdate(app.id, { labelIds: next });
   };
 
   return (
@@ -118,6 +126,28 @@ function CompanyTableRow({ app, onUpdate, hideColumn }) {
       </th>
       <td className="company-table__cell company-table__cell--muted">
         {app.positionTitle || '—'}
+      </td>
+      <td className="company-table__cell">
+        <div className="company-table__labels" role="group" aria-label={`Labels for ${app.company}`}>
+          {labels.length === 0 ? (
+            <span className="company-table__labels-empty">No labels</span>
+          ) : (
+            labels.map((label) => {
+              const on = selectedIds.includes(label.id);
+              return (
+                <button
+                  key={label.id}
+                  type="button"
+                  className={`company-table__label-chip ${on ? 'company-table__label-chip--on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => toggleLabel(label.id)}
+                >
+                  {label.name}
+                </button>
+              );
+            })
+          )}
+        </div>
       </td>
       {!hideColumn?.status && (
         <td className="company-table__cell">
@@ -218,7 +248,7 @@ function CompanyTableRow({ app, onUpdate, hideColumn }) {
   );
 }
 
-export default function CompanyBrowser({ applications, onUpdate }) {
+export default function CompanyBrowser({ applications, labels = [], onUpdate }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [groupBy, setGroupBy] = useState('');
 
@@ -358,6 +388,7 @@ export default function CompanyBrowser({ applications, onUpdate }) {
               <tr>
                 <th className="company-table__th company-table__th--company">Company</th>
                 <th className="company-table__th">Role</th>
+                <th className="company-table__th">Labels</th>
                 {!hideColumn.status && <th className="company-table__th">Status</th>}
                 {!hideColumn.industry && <th className="company-table__th">Industry</th>}
                 {!hideColumn.businessModel && <th className="company-table__th">Model</th>}
@@ -385,6 +416,7 @@ export default function CompanyBrowser({ applications, onUpdate }) {
                     <CompanyTableRow
                       key={app.id}
                       app={app}
+                      labels={labels}
                       onUpdate={onUpdate}
                       hideColumn={hideColumn}
                     />
