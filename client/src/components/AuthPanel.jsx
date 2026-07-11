@@ -1,7 +1,16 @@
 import { LogIn, UserPlus } from 'lucide-react';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from '@clerk/clerk-react';
+import { isClerkConfigured } from '../clerk';
 
 export default function AuthPanel() {
+  if (!isClerkConfigured) {
+    return (
+      <div className="auth-panel auth-panel--offline" title="Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY to client/.env.local">
+        <span className="auth-panel__email">Local mode</span>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-panel">
       <SignedOut>

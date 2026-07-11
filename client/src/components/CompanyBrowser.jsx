@@ -151,12 +151,19 @@ function CompanyTableRow({ app, labels, onUpdate, hideColumn }) {
       </td>
       {!hideColumn?.status && (
         <td className="company-table__cell">
-          <span
-            className="company-table__status"
+          <select
+            className="company-table__input company-table__input--status"
+            value={app.status || 'applied'}
+            onChange={(e) => handleChange('status', e.target.value)}
+            aria-label={`Status for ${app.company}`}
             style={{ '--status-color': statusColor }}
           >
-            {STATUS_LABELS[app.status] || app.status || '—'}
-          </span>
+            {Object.keys(STATUS_LABELS).map((key) => (
+              <option key={key} value={key}>
+                {STATUS_LABELS[key]}
+              </option>
+            ))}
+          </select>
         </td>
       )}
       {!hideColumn?.industry && (

@@ -4,6 +4,9 @@ export function getClerkPublishableKey() {
   return import.meta.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
 }
 
+/** False when client/.env.local is missing the publishable key — app still runs locally. */
+export const isClerkConfigured = Boolean(getClerkPublishableKey());
+
 export const clerkAppearance = {
   theme: dark,
   variables: {

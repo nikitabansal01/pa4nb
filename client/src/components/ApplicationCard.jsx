@@ -1,7 +1,9 @@
-import { Calendar, Building2, Briefcase, DollarSign, ArrowRight, Bell, BookOpen, Tag } from 'lucide-react';
+import { Calendar, Building2, Briefcase, DollarSign, ArrowRight, Bell, BookOpen, Tag, ChevronDown } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS, PIPELINE_MILESTONES, formatDate, relativeTime } from '../constants';
 
-function Pipeline({ status }) {
+const STATUS_OPTIONS = Object.keys(STATUS_LABELS);
+
+function Pipeline({ status, onSelectStatus }) {
   if (['rejected', 'withdrawn'].includes(status)) return null;
 
   const activeIndex = PIPELINE_MILESTONES.findIndex((milestone) =>
@@ -14,13 +16,11 @@ function Pipeline({ status }) {
         const done = activeIndex >= 0 && i <= activeIndex;
         const current = milestone.statuses.includes(status);
         const color = STATUS_COLORS[milestone.colorKey];
+        const targetStatus = milestone.statuses[0];
+        const editable = typeof onSelectStatus === 'function';
 
-        return (
-          <div
-            key={milestone.key}
-            className={`pipeline__step ${done ? 'pipeline__step--done' : ''} ${current ? 'pipeline__step--current' : ''}`}
-            title={milestone.label}
-          >
+        const content = (
+          <>
             <div className="pipeline__milestone">
               <div
                 className="pipeline__dot"
@@ -31,16 +31,87 @@ function Pipeline({ status }) {
             {i < PIPELINE_MILESTONES.length - 1 && (
               <div className="pipeline__line" style={{ background: done && activeIndex > i ? color : undefined }} />
             )}
-          </div>
+          </>
+        );
+
+        if (!editable) {
+          return (
+            <div
+              key={milestone.key}
+              className={`pipeline__step ${done ? 'pipeline__step--done' : ''} ${current ? 'pipeline__step--current' : ''}`}
+              title={milestone.label}
+            >
+              {content}
+            </div>
+          );
+        }
+
+        return (
+          <button
+            key={milestone.key}
+            type="button"
+            className={`pipeline__step pipeline__step--btn ${done ? 'pipeline__step--done' : ''} ${current ? 'pipeline__step--current' : ''}`}
+            title={`Set status to ${STATUS_LABELS[targetStatus]}`}
+            aria-pressed={current}
+            onClick={() => onSelectStatus(targetStatus)}
+          >
+            {content}
+          </button>
         );
       })}
     </div>
   );
 }
 
-export default function ApplicationCard({ app, labels = [] }) {
+function StatusSelect({ status, company, onChange }) {
+  const statusColor = STATUS_COLORS[status] || '#6B7280';
+
+  return (
+    <label
+      className="status-select"
+      style={{
+        '--accent': statusColor,
+        background: `${statusColor}22`,
+        color: statusColor,
+        borderColor: `${statusColor}55`,
+      }}
+    >
+      <span className="visually-hidden">Status for {company || 'company'}</span>
+      <select
+        className="status-select__control"
+        value={status || 'applied'}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label={`Update status for ${company || 'company'}`}
+      >
+        {STATUS_OPTIONS.map((key) => (
+          <option key={key} value={key}>
+            {STATUS_LABELS[key]}
+          </option>
+        ))}
+      </select>
+      <ChevronDown size={14} className="status-select__chevron" aria-hidden />
+    </label>
+  );
+}
+
+export default function ApplicationCard({ app, labels = [], onUpdate }) {
   const statusColor = STATUS_COLORS[app.status] || '#6B7280';
   const attachedLabels = labels.filter((label) => (app.labelIds || []).includes(label.id));
+  const canUpdate = typeof onUpdate === 'function';
+
+  const setStatus = (status) => {
+    if (!canUpdate || status === app.status) return;
+    onUpdate(app.id, { status });
+  };
+
+  const toggleLabel = (labelId) => {
+    if (!canUpdate) return;
+    const selectedIds = app.labelIds || [];
+    const next = selectedIds.includes(labelId)
+      ? selectedIds.filter((id) => id !== labelId)
+      : [...selectedIds, labelId];
+    onUpdate(app.id, { labelIds: next });
+  };
 
   return (
     <article className="app-card" style={{ '--accent': statusColor }}>
@@ -57,12 +128,16 @@ export default function ApplicationCard({ app, labels = [] }) {
             </p>
           )}
         </div>
-        <span className="status-badge" style={{ background: `${statusColor}22`, color: statusColor, borderColor: `${statusColor}55` }}>
-          {STATUS_LABELS[app.status] || app.status}
-        </span>
+        {canUpdate ? (
+          <StatusSelect status={app.status} company={app.company} onChange={setStatus} />
+        ) : (
+          <span className="status-badge" style={{ background: `${statusColor}22`, color: statusColor, borderColor: `${statusColor}55` }}>
+            {STATUS_LABELS[app.status] || app.status}
+          </span>
+        )}
       </header>
 
-      <Pipeline status={app.status} />
+      <Pipeline status={app.status} onSelectStatus={canUpdate ? setStatus : undefined} />
 
       <div className="app-card__meta">
         {app.industry && (
@@ -85,7 +160,7 @@ export default function ApplicationCard({ app, labels = [] }) {
         )}
       </div>
 
-      {(app.needsFollowUp || app.needsPrep || attachedLabels.length > 0) && (
+      {(app.needsFollowUp || app.needsPrep || attachedLabels.length > 0 || (canUpdate && labels.length > 0)) && (
         <div className="app-card__flags">
           {app.needsFollowUp && (
             <span className="flag flag--followup">
@@ -97,12 +172,28 @@ export default function ApplicationCard({ app, labels = [] }) {
               <BookOpen size={13} /> Needs prep
             </span>
           )}
-          {attachedLabels.map((label) => (
-            <span key={label.id} className="flag flag--label">
-              <Tag size={13} />
-              {label.name}
-            </span>
-          ))}
+          {canUpdate && labels.length > 0
+            ? labels.map((label) => {
+                const on = (app.labelIds || []).includes(label.id);
+                return (
+                  <button
+                    key={label.id}
+                    type="button"
+                    className={`flag flag--label flag--toggle ${on ? 'flag--toggle-on' : ''}`}
+                    aria-pressed={on}
+                    onClick={() => toggleLabel(label.id)}
+                  >
+                    <Tag size={13} />
+                    {label.name}
+                  </button>
+                );
+              })
+            : attachedLabels.map((label) => (
+                <span key={label.id} className="flag flag--label">
+                  <Tag size={13} />
+                  {label.name}
+                </span>
+              ))}
         </div>
       )}
 

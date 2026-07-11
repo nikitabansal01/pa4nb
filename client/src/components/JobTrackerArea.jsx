@@ -24,18 +24,46 @@ export default function JobTrackerArea({
 }) {
   const [jobTab, setJobTab] = useState('pipeline');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const activeCount = applications.filter((a) => !['rejected', 'withdrawn'].includes(a.status)).length;
 
   return (
-    <section className={`job-tracker-area ${nested ? 'job-tracker-area--nested' : ''}`}>
-      <div className="job-tracker-area__top">
-        {!nested && (
-          <header className="ui-section ui-section--header job-tracker-area__intro">
-            <h2>Job search</h2>
-            <p>
-              Your pipeline at a glance — voice-dump interviews, status changes, and next steps to keep everything current.
-            </p>
-          </header>
-        )}
+    <section className={`job-tracker-area ${nested ? 'job-tracker-area--nested' : ''} job-tracker-area--focus`}>
+      {!nested && (
+        <header className="ui-section ui-section--header job-tracker-area__intro">
+          <h2>Job search</h2>
+          <p>
+            Your pipeline at a glance — voice-dump interviews, status changes, and next steps to keep everything current.
+          </p>
+        </header>
+      )}
+
+      <div className="job-tracker-area__toolbar">
+        <div className="job-tracker-area__views" role="tablist" aria-label="Job search views">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={jobTab === 'pipeline'}
+            className={`job-tracker-area__view ${jobTab === 'pipeline' ? 'job-tracker-area__view--active' : ''}`}
+            onClick={() => setJobTab('pipeline')}
+          >
+            <LayoutGrid size={15} />
+            Pipeline
+            {jobTab === 'pipeline' && activeCount > 0 && (
+              <span className="job-tracker-area__count">{activeCount}</span>
+            )}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={jobTab === 'companies'}
+            className={`job-tracker-area__view ${jobTab === 'companies' ? 'job-tracker-area__view--active' : ''}`}
+            onClick={() => setJobTab('companies')}
+          >
+            <Building2 size={15} />
+            Browse
+          </button>
+        </div>
+
         <button
           type="button"
           className="icon-btn job-tracker-area__settings"
@@ -43,57 +71,37 @@ export default function JobTrackerArea({
           aria-label="Job tracker settings"
           title="Labels settings"
         >
-          <Settings size={18} />
+          <Settings size={17} />
         </button>
       </div>
 
-      <nav className="view-tabs view-tabs--nested ui-section ui-section--nav" aria-label="Job search views">
-        <button
-          type="button"
-          className={`view-tab ${jobTab === 'pipeline' ? 'view-tab--active' : ''}`}
-          onClick={() => setJobTab('pipeline')}
-        >
-          <LayoutGrid size={16} />
-          Pipeline
-        </button>
-        <button
-          type="button"
-          className={`view-tab ${jobTab === 'companies' ? 'view-tab--active' : ''}`}
-          onClick={() => setJobTab('companies')}
-        >
-          <Building2 size={16} />
-          Browse companies
-        </button>
-      </nav>
+      <DataSourceBanner
+        dataSource={dataSource}
+        isAuthenticated={isAuthenticated}
+        onClearExamples={onClearExamples}
+        onResetExamples={onResetExamples}
+        onSyncToAccount={onSyncToAccount}
+        syncing={syncing}
+        quiet
+      />
 
-      <div className="ui-stack ui-stack--work">
-        <div className="ui-block ui-block--meta">
-          <DataSourceBanner
-            dataSource={dataSource}
-            isAuthenticated={isAuthenticated}
-            onClearExamples={onClearExamples}
-            onResetExamples={onResetExamples}
-            onSyncToAccount={onSyncToAccount}
-            syncing={syncing}
-          />
-        </div>
+      {error && <div className="error-banner">{error}</div>}
 
-        {error && <div className="error-banner ui-block--toast">{error}</div>}
-
-        <div className="ui-block ui-block--content">
-          {loading ? (
-            <div className="loading">Loading your pipeline…</div>
-          ) : jobTab === 'companies' ? (
-            <CompanyBrowser
-              applications={applications}
-              labels={labels}
-              onUpdate={onUpdateApplication}
-            />
-          ) : (
-            <Dashboard applications={applications} labels={labels} />
-          )}
-        </div>
-      </div>
+      {loading ? (
+        <div className="loading">Loading your pipeline…</div>
+      ) : jobTab === 'companies' ? (
+        <CompanyBrowser
+          applications={applications}
+          labels={labels}
+          onUpdate={onUpdateApplication}
+        />
+      ) : (
+        <Dashboard
+          applications={applications}
+          labels={labels}
+          onUpdate={onUpdateApplication}
+        />
+      )}
 
       {settingsOpen && (
         <LabelsSettingsOverlay

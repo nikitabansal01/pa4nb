@@ -7,10 +7,11 @@ export default function DataSourceBanner({
   onResetExamples,
   onSyncToAccount,
   syncing,
+  quiet = false,
 }) {
   if (isAuthenticated && dataSource === 'local') {
     return (
-      <div className="data-banner data-banner--local" role="status">
+      <div className={`data-banner data-banner--local ${quiet ? 'data-banner--compact' : ''}`} role="status">
         <Cloud size={18} />
         <div>
           <strong>Signed in — saved in this browser only</strong>
@@ -27,16 +28,9 @@ export default function DataSourceBanner({
     );
   }
 
+  // Account sync is working — no need to advertise it on every visit.
   if (isAuthenticated) {
-    return (
-      <div className="data-banner data-banner--account" role="status">
-        <Cloud size={18} />
-        <div>
-          <strong>Saved to your account</strong>
-          <p>Your pipeline syncs to your signed-in account on this server.</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   if (dataSource === 'examples') {

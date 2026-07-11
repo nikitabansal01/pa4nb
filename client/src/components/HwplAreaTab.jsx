@@ -145,12 +145,51 @@ export default function HwplAreaTab({
 
   const recentEntries = entries.slice(0, 3);
 
+  const areaNav = (
+    <nav
+      className={`view-tabs view-tabs--nested ui-section ui-section--nav ${isJobSearch ? 'view-tabs--quiet' : ''}`}
+      aria-label={`${area.label} views`}
+    >
+      <button
+        type="button"
+        className={`view-tab ${tab === 'dashboard' ? 'view-tab--active' : ''}`}
+        onClick={() => handleTabChange('dashboard')}
+      >
+        Dashboard
+      </button>
+      <button
+        type="button"
+        className={`view-tab ${tab === 'log' ? 'view-tab--active' : ''}`}
+        onClick={() => handleTabChange('log')}
+      >
+        {config.logLabel}
+        {entries.length > 0 && <span className="view-tab__count">{entries.length}</span>}
+      </button>
+      {hasJobSearch && (
+        <button
+          type="button"
+          className={`view-tab ${tab === 'job-search' ? 'view-tab--active' : ''}`}
+          onClick={() => handleTabChange('job-search')}
+        >
+          Job search
+        </button>
+      )}
+    </nav>
+  );
+
   return (
-    <section className="hwpl-area-tab" style={{ '--area-color': area.color }}>
-      <header className="ui-section ui-section--header hwpl-area-tab__intro">
-        <h2>{area.label}</h2>
-        <p>{config.intro}</p>
-      </header>
+    <section
+      className={`hwpl-area-tab ${isJobSearch ? 'hwpl-area-tab--job-focus' : ''}`}
+      style={{ '--area-color': area.color }}
+    >
+      {!isJobSearch && (
+        <header className="ui-section ui-section--header hwpl-area-tab__intro">
+          <h2>{area.label}</h2>
+          <p>{config.intro}</p>
+        </header>
+      )}
+
+      {isJobSearch && areaNav}
 
       <div className="ui-block ui-block--capture">
         <VoiceDump
@@ -165,32 +204,7 @@ export default function HwplAreaTab({
         )}
       </div>
 
-      <nav className="view-tabs view-tabs--nested ui-section ui-section--nav" aria-label={`${area.label} views`}>
-        <button
-          type="button"
-          className={`view-tab ${tab === 'dashboard' ? 'view-tab--active' : ''}`}
-          onClick={() => handleTabChange('dashboard')}
-        >
-          Dashboard
-        </button>
-        <button
-          type="button"
-          className={`view-tab ${tab === 'log' ? 'view-tab--active' : ''}`}
-          onClick={() => handleTabChange('log')}
-        >
-          {config.logLabel}
-          {entries.length > 0 && <span className="view-tab__count">{entries.length}</span>}
-        </button>
-        {hasJobSearch && (
-          <button
-            type="button"
-            className={`view-tab ${tab === 'job-search' ? 'view-tab--active' : ''}`}
-            onClick={() => handleTabChange('job-search')}
-          >
-            Job search
-          </button>
-        )}
-      </nav>
+      {!isJobSearch && areaNav}
 
       {tab === 'job-search' && hasJobSearch ? (
         <JobTrackerArea nested {...jobTracker} />

@@ -16,10 +16,21 @@ import {
   mergeApplications,
 } from './storage';
 import { DEFAULT_LIFE_DESIGN, normalizeLifeDesign } from './lifeDesign';
+import { isClerkConfigured } from './clerk';
 
 const API = '/api';
 
-export function useAuth() {
+function useGuestAuth() {
+  return {
+    user: null,
+    isAuthenticated: false,
+    authLoading: false,
+    getToken: async () => null,
+    signOut: async () => {},
+  };
+}
+
+function useClerkAppAuth() {
   const { isSignedIn, isLoaded, getToken, signOut } = useClerkAuth();
   const { user: clerkUser } = useUser();
 
@@ -41,6 +52,8 @@ export function useAuth() {
     signOut,
   };
 }
+
+export const useAuth = isClerkConfigured ? useClerkAppAuth : useGuestAuth;
 
 export function useApplications() {
   const { isAuthenticated, authLoading, getToken } = useAuth();
