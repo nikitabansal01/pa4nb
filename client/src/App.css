@@ -2303,6 +2303,93 @@
   gap: 0.75rem;
 }
 
+.google-cal-panel {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+}
+
+.google-cal-panel--muted {
+  opacity: 0.8;
+}
+
+.google-cal-panel__head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.google-cal-panel__head h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.google-cal-panel__badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+
+.google-cal-panel__badge.is-on {
+  color: color-mix(in srgb, var(--accent-cyan) 80%, white);
+}
+
+.google-cal-panel__hint,
+.google-cal-panel p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.google-cal-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.google-cal-panel__msg {
+  color: color-mix(in srgb, var(--accent-cyan) 75%, white) !important;
+}
+
+.google-cal-panel__error {
+  color: #f0a0a0 !important;
+}
+
+.google-cal-panel__events ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.google-cal-panel__events li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.16);
+  font-size: 0.8rem;
+}
+
+.google-cal-panel__events li strong {
+  font-weight: 600;
+}
+
+.google-cal-panel__events li span,
+.google-cal-panel__empty {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
 .job-tracker-area__views {
   display: inline-flex;
   align-items: center;

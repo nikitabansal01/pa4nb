@@ -24,6 +24,23 @@ import { parseVoiceDump, applyVoiceDumpResult } from './parser.js';
 import { mergeApplicationLists, stripExamples } from './applicationsMerge.js';
 import { DEFAULT_APPLICATION, STATUSES, INDUSTRIES, BUSINESS_MODELS, FUNDING_STAGES } from './constants.js';
 import { getStorageMode } from './store.js';
+import {
+  isGoogleConfigured,
+  createOAuthState,
+  verifyOAuthState,
+  buildGoogleAuthUrl,
+  exchangeCodeForTokens,
+  getValidAccessToken,
+  listUpcomingEvents,
+  revokeGoogleToken,
+  getClientRedirectBase,
+} from './google.js';
+import {
+  readGoogleTokens,
+  writeGoogleTokens,
+  deleteGoogleTokens,
+  publicGoogleStatus,
+} from './googleStore.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -49,6 +66,7 @@ app.get('/', (_req, res) => {
       applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
       labels: 'GET/POST/PUT/DELETE /api/labels (auth required)',
       voiceDump: 'POST /api/voice-dump',
+      google: 'GET /api/google/status | /api/google/connect | /api/google/events | DELETE /api/google/disconnect',
       meta: '/api/meta',
     },
   });
@@ -60,6 +78,7 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     aiEnabled: Boolean(process.env.OPENAI_API_KEY),
     authEnabled: isClerkEnabled(),
+    googleCalendarEnabled: isGoogleConfigured(),
     storage,
   });
 });
@@ -262,6 +281,104 @@ app.get('/api/meta', (_req, res) => {
     businessModels: BUSINESS_MODELS,
     fundingStages: FUNDING_STAGES,
   });
+});
+
+app.get('/api/google/status', requireAuth, async (req, res) => {
+  try {
+    if (!isGoogleConfigured()) {
+      return res.json({ configured: false, connected: false });
+    }
+    const tokens = await readGoogleTokens(req.user.id);
+    res.json({ configured: true, ...publicGoogleStatus(tokens) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/google/connect', requireAuth, async (req, res) => {
+  try {
+    if (!isGoogleConfigured()) {
+      return res.status(503).json({ error: 'Google Calendar is not configured on this server' });
+    }
+    const state = createOAuthState(req.user.id);
+    const url = buildGoogleAuthUrl(state);
+    res.json({ url });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/google/callback', async (req, res) => {
+  const clientBase = getClientRedirectBase();
+  try {
+    const { code, state, error } = req.query;
+    if (error) {
+      return res.redirect(`${clientBase}/?google=error&reason=${encodeURIComponent(String(error))}`);
+    }
+    if (!code || !state) {
+      return res.redirect(`${clientBase}/?google=error&reason=missing_code`);
+    }
+
+    const { userId } = verifyOAuthState(String(state));
+    const tokens = await exchangeCodeForTokens(String(code));
+    if (!tokens.refreshToken) {
+      const existing = await readGoogleTokens(userId);
+      if (!existing?.refreshToken) {
+        return res.redirect(`${clientBase}/?google=error&reason=missing_refresh_token`);
+      }
+      tokens.refreshToken = existing.refreshToken;
+    }
+
+    await writeGoogleTokens(userId, {
+      ...tokens,
+      connectedAt: new Date().toISOString(),
+    });
+
+    res.redirect(`${clientBase}/?google=connected`);
+  } catch (error) {
+    console.error('Google OAuth callback failed:', error);
+    res.redirect(
+      `${clientBase}/?google=error&reason=${encodeURIComponent(error.message || 'oauth_failed')}`
+    );
+  }
+});
+
+app.get('/api/google/events', requireAuth, async (req, res) => {
+  try {
+    if (!isGoogleConfigured()) {
+      return res.status(503).json({ error: 'Google Calendar is not configured on this server' });
+    }
+
+    const stored = await readGoogleTokens(req.user.id);
+    if (!stored?.refreshToken && !stored?.accessToken) {
+      return res.status(400).json({ error: 'Connect Google Calendar first' });
+    }
+
+    const accessToken = await getValidAccessToken(stored, async (next) => {
+      await writeGoogleTokens(req.user.id, next);
+    });
+
+    const events = await listUpcomingEvents(accessToken);
+    res.json({
+      events,
+      window: { daysBack: 7, daysForward: 21 },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete('/api/google/disconnect', requireAuth, async (req, res) => {
+  try {
+    const stored = await readGoogleTokens(req.user.id);
+    if (stored) {
+      await revokeGoogleToken(stored.refreshToken || stored.accessToken);
+      await deleteGoogleTokens(req.user.id);
+    }
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.use((err, _req, res, _next) => {

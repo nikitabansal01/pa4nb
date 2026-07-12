@@ -4,6 +4,7 @@ import Dashboard from './Dashboard';
 import CompanyBrowser from './CompanyBrowser';
 import DataSourceBanner from './DataSourceBanner';
 import LabelsSettingsOverlay from './LabelsSettingsOverlay';
+import GoogleCalendarPanel from './GoogleCalendarPanel';
 
 export default function JobTrackerArea({
   applications,
@@ -36,6 +37,8 @@ export default function JobTrackerArea({
           </p>
         </header>
       )}
+
+      <GoogleCalendarPanel enabled={isAuthenticated} />
 
       <div className="job-tracker-area__toolbar">
         <div className="job-tracker-area__views" role="tablist" aria-label="Job search views">
