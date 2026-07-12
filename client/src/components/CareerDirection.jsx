@@ -6,8 +6,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   FileText,
   Star,
   Bookmark,
@@ -34,6 +33,75 @@ const ACCEPTED_LABEL = 'PDF, DOC, DOCX, or TXT';
 
 function fieldFilled(value) {
   return Boolean(String(value || '').trim());
+}
+
+function splitPillValues(value) {
+  return String(value || '')
+    .split(/[,;·|]+|\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function joinPillValues(pills) {
+  return pills.join(', ');
+}
+
+function PillField({ value, onChange, onFocus, placeholder, 'aria-label': ariaLabel }) {
+  const [draft, setDraft] = useState('');
+  const pills = splitPillValues(value);
+
+  const commitDraft = () => {
+    const next = draft.trim();
+    if (!next) return;
+    const exists = pills.some((pill) => pill.toLowerCase() === next.toLowerCase());
+    if (!exists) onChange(joinPillValues([...pills, next]));
+    setDraft('');
+  };
+
+  const removePill = (index) => {
+    onChange(joinPillValues(pills.filter((_, i) => i !== index)));
+  };
+
+  return (
+    <div
+      className="career-direction__pills"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) e.currentTarget.querySelector('input')?.focus();
+      }}
+    >
+      {pills.map((pill, index) => (
+        <span key={`${pill}-${index}`} className="career-direction__pill">
+          {pill}
+          <button
+            type="button"
+            className="career-direction__pill-remove"
+            aria-label={`Remove ${pill}`}
+            onClick={() => removePill(index)}
+          >
+            <X size={12} />
+          </button>
+        </span>
+      ))}
+      <input
+        type="text"
+        className="career-direction__pill-input"
+        value={draft}
+        aria-label={ariaLabel}
+        placeholder={pills.length === 0 ? placeholder : ''}
+        onFocus={onFocus}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            commitDraft();
+          } else if (e.key === 'Backspace' && !draft && pills.length > 0) {
+            removePill(pills.length - 1);
+          }
+        }}
+        onBlur={commitDraft}
+      />
+    </div>
+  );
 }
 
 function RouteCard({ path, isPrimary, onExplore }) {
@@ -197,7 +265,6 @@ export default function CareerDirection({
   const [snapshot, setSnapshot] = useState(EMPTY_SNAPSHOT);
   const [hasParsed, setHasParsed] = useState(false);
   const [answers, setAnswers] = useState({});
-  const [questionIndex, setQuestionIndex] = useState(0);
   const [generateNote, setGenerateNote] = useState(null);
   const [reflectionComplete, setReflectionComplete] = useState(false);
   const [view, setView] = useState('intake'); // intake | results
@@ -211,6 +278,8 @@ export default function CareerDirection({
   const [focusField, setFocusField] = useState(null);
   const [exploredRouteId, setExploredRouteId] = useState(null);
   const [importBaseline, setImportBaseline] = useState(null);
+  const [fromResumeOpen, setFromResumeOpen] = useState(false);
+  const [needsWriteupOpen, setNeedsWriteupOpen] = useState(true);
   const snapshotSectionRef = useRef(null);
   const reflectionSectionRef = useRef(null);
 
@@ -243,9 +312,6 @@ export default function CareerDirection({
     }
   }, [profile]);
 
-  const currentQuestion = REFLECTION_QUESTIONS[questionIndex];
-  const currentAnswer = answers[currentQuestion.id] || '';
-  const isLastQuestion = questionIndex === REFLECTION_QUESTIONS.length - 1;
   const answeredCount = REFLECTION_QUESTIONS.filter((q) => fieldFilled(answers[q.id])).length;
 
   const progress = useMemo(() => {
@@ -358,6 +424,8 @@ export default function CareerDirection({
     setFileName(next?.resume?.fileName || nextFileName || '');
     setLinkedinUrl(next?.resume?.linkedinUrl || nextLinkedinUrl || '');
     setImportStatus('success');
+    setFromResumeOpen(false);
+    setNeedsWriteupOpen(true);
 
     if (parseMode === 'llm') {
       setImportMessage(warning || 'Background extracted.');
@@ -372,11 +440,14 @@ export default function CareerDirection({
 
   const jumpToSnapshotField = (fieldKey) => {
     if (!fieldKey) return;
+    const status = fieldStatus(fieldKey);
+    if (status === 'add' || status === 'review') setNeedsWriteupOpen(true);
+    else setFromResumeOpen(true);
     setFocusField(fieldKey);
     snapshotSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.setTimeout(() => {
       const input = snapshotSectionRef.current?.querySelector(
-        `[data-field="${fieldKey}"] .compass-field__input`
+        `[data-field="${fieldKey}"] .career-direction__pill-input, [data-field="${fieldKey}"] .compass-field__input`
       );
       input?.focus?.();
     }, 280);
@@ -400,9 +471,13 @@ export default function CareerDirection({
   }
 
   const jumpToReflection = (questionId) => {
-    const index = REFLECTION_QUESTIONS.findIndex((q) => q.id === questionId);
-    if (index >= 0) setQuestionIndex(index);
+    setNeedsWriteupOpen(true);
     reflectionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      reflectionSectionRef.current
+        ?.querySelector(`[data-question="${questionId}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
   };
 
   const handleUploadClick = () => fileInputRef.current?.click();
@@ -492,26 +567,22 @@ export default function CareerDirection({
     });
   };
 
-  const setAnswer = (value) => {
+  const setAnswerFor = (questionId, value) => {
     setAnswers((prev) => {
-      const next = { ...prev, [currentQuestion.id]: value };
-      updateReflection(next, { complete: false });
+      const next = { ...prev, [questionId]: value };
+      const complete = REFLECTION_QUESTIONS.every((q) => fieldFilled(next[q.id]));
+      setReflectionComplete(complete);
+      updateReflection(next, { complete });
       return next;
     });
   };
 
-  const goNext = () => {
-    if (!isLastQuestion) {
-      setQuestionIndex((i) => i + 1);
-      return;
-    }
-    setReflectionComplete(true);
-    updateReflection(answers, { complete: true });
-    setGenerateNote('Reflection complete. Generate paths to compare options — not one answer.');
-  };
-
-  const goPrev = () => {
-    if (questionIndex > 0) setQuestionIndex((i) => i - 1);
+  const toggleMultiAnswer = (questionId, option) => {
+    const selected = splitPillValues(answers[questionId] || '');
+    const next = selected.includes(option)
+      ? selected.filter((item) => item !== option)
+      : [...selected, option];
+    setAnswerFor(questionId, joinPillValues(next));
   };
 
   const applyGeneratedProfile = (next) => {
@@ -546,8 +617,9 @@ export default function CareerDirection({
 
   const handleGenerate = async () => {
     if (answeredCount < REFLECTION_QUESTIONS.length && !reflectionComplete) {
-      setGenerateNote('Finish the reflection questions first — paths work better with your full context.');
-      setQuestionIndex(Math.min(answeredCount, REFLECTION_QUESTIONS.length - 1));
+      setGenerateNote('Finish preferences first — paths work better with your full context.');
+      setNeedsWriteupOpen(true);
+      reflectionSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
     if (progress < 35) {
@@ -580,7 +652,7 @@ export default function CareerDirection({
 
   const handleReopenReflection = () => {
     setView('intake');
-    setQuestionIndex(0);
+    setNeedsWriteupOpen(true);
     setGenerateNote('Update any answers, then generate paths again.');
   };
 
@@ -843,73 +915,36 @@ export default function CareerDirection({
           </div>
         </div>
 
-        {insights && (
-          <p className="career-direction__parse-note" aria-live="polite">
-            {insights.signals.length > 0 && (
-              <span className="career-direction__parse-note-got">
-                From resume: {insights.signals.map((s) => s.label || s.title).join(' · ')}
-              </span>
-            )}
-            {(insights.fieldGaps?.length > 0 || insights.reflectionGap) && (
-              <span className="career-direction__parse-note-need">
-                {insights.signals.length > 0 ? ' · ' : ''}
-                Needs you:{' '}
-                {insights.fieldGaps?.map((item, i) => (
-                  <span key={item.id}>
-                    {i > 0 ? ', ' : ''}
-                    <button
-                      type="button"
-                      className="career-direction__parse-link"
-                      onClick={() => jumpToSnapshotField(item.field)}
-                    >
-                      {item.label || item.title}
-                    </button>
-                  </span>
-                ))}
-                {insights.reflectionGap && (
-                  <>
-                    {insights.fieldGaps?.length ? ', ' : ''}
-                    <button
-                      type="button"
-                      className="career-direction__parse-link"
-                      onClick={() => jumpToReflection(insights.reflectionGap.reflectionId)}
-                    >
-                      {insights.reflectionGap.label}
-                    </button>
-                  </>
-                )}
-              </span>
-            )}
-          </p>
-        )}
-
-        <div className="career-direction__snapshot-grid">
-          {SNAPSHOT_FIELDS.map((field) => {
-            const status = hasParsed ? fieldStatus(field.key) : (fieldFilled(snapshot[field.key]) ? 'yours' : 'add');
-            const needsYou = status === 'add' || status === 'review';
+        {(() => {
+          const renderField = (field) => {
+            const status = hasParsed
+              ? fieldStatus(field.key)
+              : (fieldFilled(snapshot[field.key]) ? 'yours' : 'add');
+            const open = status === 'add' || status === 'review';
             const hint = insights?.fieldHints?.[field.key];
             const focused = focusField === field.key;
             return (
               <label
                 key={field.key}
                 data-field={field.key}
-                className={`career-direction__field${needsYou ? ` career-direction__field--${status}` : ''}${focused ? ' career-direction__field--focused' : ''}`}
+                className={`career-direction__field${open ? ' career-direction__field--open' : ' career-direction__field--settled'}${focused ? ' career-direction__field--focused' : ''}`}
               >
-                <span className="career-direction__field-label">
-                  {field.label}
-                  {needsYou && (
-                    <em className="career-direction__field-badge">
-                      {status === 'review' ? 'Review' : 'Add'}
-                    </em>
-                  )}
-                </span>
-                {hint && needsYou && (
+                <span className="career-direction__field-label">{field.label}</span>
+                {hint && open && (
                   <span className="career-direction__field-hint">{hint}</span>
                 )}
-                {field.multiline ? (
+                {field.pills ? (
+                  <PillField
+                    value={snapshot[field.key]}
+                    onChange={(next) => handleSnapshotChange(field.key, next)}
+                    onFocus={() => setFocusField(field.key)}
+                    placeholder={field.placeholder}
+                    aria-label={field.label}
+                  />
+                ) : field.multiline ? (
                   <textarea
                     className="compass-field__input"
-                    rows={2}
+                    rows={3}
                     value={snapshot[field.key]}
                     onChange={(e) => handleSnapshotChange(field.key, e.target.value)}
                     onFocus={() => setFocusField(field.key)}
@@ -927,58 +962,163 @@ export default function CareerDirection({
                 )}
               </label>
             );
-          })}
-        </div>
-      </div>
+          };
 
-      <div ref={reflectionSectionRef} className="career-direction__card career-direction__reflection">
-        <div className="career-direction__card-header">
-          <div>
-            <h3>Preferences</h3>
-          </div>
-          <span className="career-direction__question-count">
-            {questionIndex + 1} / {REFLECTION_QUESTIONS.length}
-            {reflectionComplete ? ' · Done' : ''}
-          </span>
-        </div>
+          const openFields = hasParsed
+            ? SNAPSHOT_FIELDS.filter((f) => {
+              const s = fieldStatus(f.key);
+              return s === 'add' || s === 'review';
+            })
+            : SNAPSHOT_FIELDS;
+          const settledFields = hasParsed
+            ? SNAPSHOT_FIELDS.filter((f) => {
+              const s = fieldStatus(f.key);
+              return s !== 'add' && s !== 'review';
+            })
+            : [];
 
-        <div className="career-direction__question" key={currentQuestion.id}>
-          <h4>{currentQuestion.prompt}</h4>
+          const preferencesBlock = (
+            <div ref={reflectionSectionRef} className="career-direction__preferences">
+              <div className="career-direction__preferences-head">
+                <h5>Preferences</h5>
+                <span className="career-direction__question-count">
+                  {answeredCount} / {REFLECTION_QUESTIONS.length}
+                  {reflectionComplete ? ' · Done' : ''}
+                </span>
+              </div>
 
-          {currentQuestion.type === 'choice' ? (
-            <div className="career-direction__choices" role="group" aria-label={currentQuestion.prompt}>
-              {currentQuestion.options.map((option) => (
-                <button
-                  key={option}
-                  type="button"
-                  className={`career-direction__choice${currentAnswer === option ? ' career-direction__choice--active' : ''}`}
-                  onClick={() => setAnswer(option)}
-                >
-                  {option}
-                </button>
-              ))}
+              <div className="career-direction__pref-list">
+                {REFLECTION_QUESTIONS.map((question, index) => {
+                  const value = answers[question.id] || '';
+                  const selected = splitPillValues(value);
+                  const multi = question.type === 'multi';
+                  return (
+                    <div
+                      key={question.id}
+                      data-question={question.id}
+                      className="career-direction__pref-item"
+                    >
+                      <div className="career-direction__pref-prompt-row">
+                        <span className="career-direction__pref-num" aria-hidden="true">
+                          {String(index + 1).padStart(2, '0')}
+                        </span>
+                        <div className="career-direction__pref-prompt-copy">
+                          <p className="career-direction__pref-prompt">{question.prompt}</p>
+                          <span className="career-direction__pref-hint">
+                            {multi ? 'Select all that apply' : 'Choose one'}
+                          </span>
+                        </div>
+                      </div>
+                      {(question.type === 'choice' || question.type === 'multi') && (
+                        <div
+                          className="career-direction__choices"
+                          role="group"
+                          aria-label={question.prompt}
+                        >
+                          {question.options.map((option) => {
+                            const active = multi
+                              ? selected.includes(option)
+                              : value === option;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                className={`career-direction__choice${active ? ' career-direction__choice--active' : ''}`}
+                                onClick={() => {
+                                  if (multi) toggleMultiAnswer(question.id, option);
+                                  else setAnswerFor(question.id, option);
+                                }}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          ) : (
-            <textarea
-              className="compass-field__input"
-              rows={4}
-              value={currentAnswer}
-              onChange={(e) => setAnswer(e.target.value)}
-              placeholder={currentQuestion.placeholder}
-            />
-          )}
-        </div>
+          );
 
-        <div className="career-direction__question-nav">
-          <button type="button" className="auth-btn" onClick={goPrev} disabled={questionIndex === 0}>
-            <ChevronLeft size={16} />
-            Back
-          </button>
-          <button type="button" className="auth-btn auth-btn--primary" onClick={goNext}>
-            {isLastQuestion ? 'Finish reflection' : 'Next'}
-            {!isLastQuestion && <ChevronRight size={16} />}
-          </button>
-        </div>
+          const parsedSection = settledFields.length > 0 && (
+            <div className="career-direction__group career-direction__group--settled">
+              <button
+                type="button"
+                className="career-direction__collapse-toggle"
+                aria-expanded={fromResumeOpen}
+                onClick={() => setFromResumeOpen((open) => !open)}
+              >
+                <ChevronDown
+                  size={18}
+                  className={`career-direction__collapse-chevron${fromResumeOpen ? ' is-open' : ''}`}
+                />
+                <span className="career-direction__collapse-copy">
+                  <span className="career-direction__collapse-label">
+                    Already parsed from your resume
+                  </span>
+                  <span className="career-direction__collapse-sub">
+                    AI filled these — expand only to correct something
+                  </span>
+                </span>
+                <span className="career-direction__collapse-meta">{settledFields.length}</span>
+              </button>
+              {fromResumeOpen && (
+                <div className="career-direction__collapse-body">
+                  <div className="career-direction__snapshot-grid">
+                    {settledFields.map(renderField)}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+
+          const writeupSection = (
+            <div className="career-direction__group career-direction__group--open">
+              <button
+                type="button"
+                className="career-direction__collapse-toggle"
+                aria-expanded={needsWriteupOpen}
+                onClick={() => setNeedsWriteupOpen((open) => !open)}
+              >
+                <ChevronDown
+                  size={18}
+                  className={`career-direction__collapse-chevron${needsWriteupOpen ? ' is-open' : ''}`}
+                />
+                <span className="career-direction__collapse-copy">
+                  <span className="career-direction__collapse-label">Needs a write-up</span>
+                  <span className="career-direction__collapse-sub">
+                    Thin resume gaps + your preferences
+                  </span>
+                </span>
+                <span className="career-direction__collapse-meta">
+                  {openFields.length + (REFLECTION_QUESTIONS.length - answeredCount)}
+                </span>
+              </button>
+              {needsWriteupOpen && (
+                <div className="career-direction__collapse-body">
+                  {openFields.length > 0 && (
+                    <div className="career-direction__writeup-fields">
+                      <p className="career-direction__writeup-kicker">Fill these in</p>
+                      <div className="career-direction__snapshot-grid">
+                        {openFields.map(renderField)}
+                      </div>
+                    </div>
+                  )}
+                  {preferencesBlock}
+                </div>
+              )}
+            </div>
+          );
+
+          return (
+            <div className="career-direction__snapshot-groups">
+              {hasParsed ? parsedSection : null}
+              {writeupSection}
+            </div>
+          );
+        })()}
       </div>
 
       <div className="career-direction__cta-row">

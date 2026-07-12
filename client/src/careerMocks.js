@@ -46,14 +46,29 @@ export const REFLECTION_QUESTIONS = [
   {
     id: 'energy',
     prompt: 'Which parts of your past work gave you the most energy?',
-    type: 'text',
-    placeholder: 'e.g. early discovery with customers, shipping 0→1 bets…',
+    type: 'multi',
+    options: [
+      'Customer discovery',
+      '0→1 shipping',
+      'Experimentation',
+      'Strategy & vision',
+      'Cross-functional leadership',
+      'Technical depth',
+      'GTM / growth',
+    ],
   },
   {
     id: 'lessOf',
     prompt: 'Which responsibilities do you want less of?',
-    type: 'text',
-    placeholder: 'e.g. heavy process overhead, pure status reporting…',
+    type: 'multi',
+    options: [
+      'Heavy process',
+      'Status reporting',
+      'Constant firefighting',
+      'Politics / alignment theater',
+      'Maintenance-only work',
+      'Execution without strategy',
+    ],
   },
   {
     id: 'productSurface',
@@ -76,24 +91,40 @@ export const REFLECTION_QUESTIONS = [
   {
     id: 'domains',
     prompt: 'Which domains currently excite you?',
-    type: 'text',
-    placeholder: 'e.g. AI tooling, climate, health, developer platforms…',
+    type: 'multi',
+    options: [
+      'AI / ML products',
+      'Developer platforms',
+      'Health / clinical',
+      'Fintech',
+      'Climate',
+      'Marketplace',
+      'Consumer',
+      'B2B SaaS',
+    ],
   },
   {
     id: 'learnNext',
     prompt: 'What do you want your next role to teach you?',
-    type: 'text',
-    placeholder: 'e.g. deeper technical fluency, GTM ownership, org leadership…',
+    type: 'multi',
+    options: [
+      'Deeper technical fluency',
+      'GTM ownership',
+      'Org leadership',
+      'Domain expertise',
+      '0→1 craft',
+      'Platform thinking',
+    ],
   },
 ];
 
 export const SNAPSHOT_FIELDS = [
   { key: 'currentRole', label: 'Current role', placeholder: 'e.g. Senior Product Manager' },
   { key: 'yearsExperience', label: 'Years of experience', placeholder: 'e.g. 8' },
-  { key: 'previousRoles', label: 'Previous roles', placeholder: 'Comma-separated roles', multiline: true },
-  { key: 'industries', label: 'Industries', placeholder: 'e.g. SaaS, Fintech', multiline: true },
-  { key: 'skills', label: 'Skills', placeholder: 'Skills that show up in your work', multiline: true },
-  { key: 'productsBuilt', label: 'Products or systems built', placeholder: 'What you shipped or owned', multiline: true },
+  { key: 'previousRoles', label: 'Previous roles', placeholder: 'Add a role', pills: true },
+  { key: 'industries', label: 'Industries', placeholder: 'Add an industry', pills: true },
+  { key: 'skills', label: 'Skills', placeholder: 'Add a skill', pills: true },
+  { key: 'productsBuilt', label: 'Products or systems built', placeholder: 'What you shipped + outcome', multiline: true },
   { key: 'leadership', label: 'Leadership experience', placeholder: 'Teams led, mentoring, influence', multiline: true },
 ];
 
@@ -182,8 +213,11 @@ function fieldText(snapshot, key) {
 }
 
 function hasOutcomeSignal(text) {
+  // Strip common role/product labels that contain digits (B2B, B2C) so they
+  // don't count as impact evidence.
+  const cleaned = String(text || '').replace(/\bb2[bc]\b/gi, '');
   return /\d|%|\bx\b|growth|retention|revenue|users|nps|conversion|arr|mrr|latency|adoption/i.test(
-    text || ''
+    cleaned
   );
 }
 
