@@ -1,5 +1,5 @@
 import { useAuth as useClerkAuth, useUser } from '@clerk/clerk-react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getLocalApplications,
   saveLocalApplications,
@@ -12,8 +12,20 @@ import {
   authHeaders,
   stripExamples,
   mergeApplications,
+  getCareerProfile,
+  saveCareerProfile,
 } from './storage';
 import { isClerkConfigured } from './clerk';
+import {
+  applyResumeImport,
+  applySnapshot,
+  applyReflection,
+  applyGeneratedPaths,
+  applyPathSelection,
+  appendLearningTopicFromReflection,
+  getDirectionSnapshot,
+} from './careerProfile';
+import { buildAssumptionsFromAnswers, buildCareerPaths } from './careerMocks';
 
 const API = '/api';
 
@@ -458,4 +470,75 @@ export function useHealth() {
   }, []);
 
   return { aiEnabled };
+}
+
+export function useCareerProfile() {
+  const [profile, setProfile] = useState(() => getCareerProfile());
+
+  const commit = useCallback((next) => {
+    const saved = saveCareerProfile(next);
+    setProfile(saved);
+    return saved;
+  }, []);
+
+  const refreshProfile = useCallback(() => {
+    const latest = getCareerProfile();
+    setProfile(latest);
+    return latest;
+  }, []);
+
+  const importResume = useCallback((payload) => {
+    return commit(applyResumeImport(getCareerProfile(), payload));
+  }, [commit]);
+
+  const updateSnapshot = useCallback((snapshot) => {
+    return commit(applySnapshot(getCareerProfile(), snapshot));
+  }, [commit]);
+
+  const updateReflection = useCallback((answers, { complete = false } = {}) => {
+    return commit(applyReflection(getCareerProfile(), { answers, complete }));
+  }, [commit]);
+
+  const generatePaths = useCallback((overrides = {}) => {
+    const current = getCareerProfile();
+    const assumptions = overrides.assumptions
+      || current.assumptions
+      || buildAssumptionsFromAnswers(current.reflection, current.snapshot);
+    const paths = overrides.paths || buildCareerPaths(current.snapshot, assumptions);
+    return commit(applyGeneratedPaths(current, { paths, assumptions }));
+  }, [commit]);
+
+  const selectPaths = useCallback(({ primaryPathId, secondaryPathId }) => {
+    return commit(applyPathSelection(getCareerProfile(), { primaryPathId, secondaryPathId }));
+  }, [commit]);
+
+  const updateAssumptions = useCallback((assumptions) => {
+    const current = getCareerProfile();
+    return commit({
+      ...current,
+      assumptions,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [commit]);
+
+  const addLearningFromReflection = useCallback((payload) => {
+    return commit(appendLearningTopicFromReflection(getCareerProfile(), payload));
+  }, [commit]);
+
+  const direction = useMemo(() => getDirectionSnapshot(profile), [profile]);
+
+  return {
+    profile,
+    direction,
+    workflow: profile.workflow,
+    refreshProfile,
+    importResume,
+    updateSnapshot,
+    updateReflection,
+    generatePaths,
+    selectPaths,
+    updateAssumptions,
+    addLearningFromReflection,
+    setProfile: commit,
+  };
 }

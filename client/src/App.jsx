@@ -1,10 +1,37 @@
 import { useState } from 'react';
-import { Briefcase, RefreshCw } from 'lucide-react';
+import {
+  Briefcase,
+  RefreshCw,
+  Sun,
+  Compass,
+  MessageSquare,
+  BookOpen,
+} from 'lucide-react';
 import AuthPanel from './components/AuthPanel';
 import VoiceDump from './components/VoiceDump';
 import JobTrackerArea from './components/JobTrackerArea';
-import { useApplications, useHealth, useAuth } from './hooks';
+import CareerDirection from './components/CareerDirection';
+import Today from './components/Today';
+import InterviewPrep from './components/InterviewPrep';
+import Learning from './components/Learning';
+import PillarsStrip, { getPillarForNav } from './components/PillarsStrip';
+import { PageError, PageLoading } from './components/PageStatus';
+import { useApplications, useHealth, useAuth, useCareerProfile } from './hooks';
 import './App.css';
+
+const NAV_ITEMS = [
+  { id: 'today', label: 'Today', shortLabel: 'Today', icon: Sun, group: 'track' },
+  { id: 'direction', label: 'Career Direction', shortLabel: 'Direction', icon: Compass, group: 'decide' },
+  { id: 'opportunities', label: 'Opportunities', shortLabel: 'Track', icon: Briefcase, group: 'track' },
+  { id: 'interview', label: 'Interview Prep', shortLabel: 'Prep', icon: MessageSquare, group: 'prepare' },
+  { id: 'learning', label: 'Learning', shortLabel: 'Learn', icon: BookOpen, group: 'prepare' },
+];
+
+const NAV_GROUPS = [
+  { id: 'decide', label: 'Decide where to go' },
+  { id: 'track', label: 'Track opportunities' },
+  { id: 'prepare', label: 'Prepare to succeed' },
+];
 
 export default function App() {
   const { isAuthenticated } = useAuth();
@@ -25,10 +52,22 @@ export default function App() {
     syncToAccount,
     applySyncedApplications,
   } = useApplications();
+  const career = useCareerProfile();
   const { aiEnabled } = useHealth();
   const [jobVoiceProcessing, setJobVoiceProcessing] = useState(false);
   const [jobVoiceSummary, setJobVoiceSummary] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const [activeNav, setActiveNav] = useState('today');
+  const [opportunityFocus, setOpportunityFocus] = useState(null);
+
+  const handleContinuePrep = (appId) => {
+    if (appId) {
+      setOpportunityFocus({ appId, tab: 'prep' });
+      setActiveNav('opportunities');
+      return;
+    }
+    setActiveNav('interview');
+  };
 
   const handleJobVoiceSubmit = async (transcript) => {
     setJobVoiceProcessing(true);
@@ -61,6 +100,46 @@ export default function App() {
     }
   };
 
+  const renderNavButtons = (classPrefix) => {
+    if (classPrefix === 'sidebar') {
+      return NAV_GROUPS.map((group) => (
+        <div key={group.id} className="sidebar__group">
+          <p className="sidebar__group-label">{group.label}</p>
+          {NAV_ITEMS.filter((item) => item.group === group.id).map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={`sidebar__item${activeNav === id ? ' sidebar__item--active' : ''}`}
+              onClick={() => setActiveNav(id)}
+              aria-current={activeNav === id ? 'page' : undefined}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      ));
+    }
+
+    return NAV_ITEMS.map(({ id, label, shortLabel, icon: Icon }) => (
+      <button
+        key={id}
+        type="button"
+        className={`${classPrefix}__item${activeNav === id ? ` ${classPrefix}__item--active` : ''}`}
+        onClick={() => setActiveNav(id)}
+        aria-current={activeNav === id ? 'page' : undefined}
+        aria-label={label}
+        title={label}
+      >
+        <Icon size={20} />
+        <span>{classPrefix === 'mobile-nav' ? shortLabel : label}</span>
+      </button>
+    ));
+  };
+
+  const activePillar = getPillarForNav(activeNav);
+  const showPipelineLoading = loading && ['today', 'interview', 'learning', 'opportunities'].includes(activeNav);
+
   return (
     <div className="app">
       <div className="bg-glow bg-glow--1" />
@@ -68,59 +147,137 @@ export default function App() {
       <div className="bg-glow bg-glow--3" />
       <div className="bg-glow bg-glow--4" />
 
-      <header className="header">
-        <div className="header__brand">
-          <div className="header__icon">
-            <Briefcase size={22} />
-          </div>
-          <div>
-            <h1 className="header__wordmark">Job Tracker</h1>
-            <p>Voice updates, pipeline, and calendar-aware interview sync</p>
-          </div>
-        </div>
-        <div className="header__meta">
-          <span className={`mode-badge ${aiEnabled ? 'mode-badge--ai' : ''}`}>
-            {aiEnabled ? 'AI parsing on' : 'Heuristic mode'}
-          </span>
-          <AuthPanel />
-          <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh">
-            <RefreshCw size={18} />
-          </button>
-        </div>
-      </header>
-
-      <main className="main">
-        <div className="ui-block ui-block--capture">
-          <VoiceDump
-            onSubmit={handleJobVoiceSubmit}
-            processing={jobVoiceProcessing}
-            currentArea="jobs"
-          />
-          {jobVoiceSummary && (
-            <div className="toast" role="status">
-              {jobVoiceSummary}
+      <div className="app-shell">
+        <aside className="sidebar" aria-label="Primary">
+          <div className="sidebar__brand">
+            <div className="header__icon">
+              <Briefcase size={20} />
             </div>
-          )}
-        </div>
+            <div>
+              <p className="sidebar__wordmark">Career OS</p>
+              <p className="sidebar__tag">Decide · Track · Prepare</p>
+            </div>
+          </div>
+          <nav className="sidebar__nav">{renderNavButtons('sidebar')}</nav>
+        </aside>
 
-        <JobTrackerArea
-          applications={applications}
-          labels={labels}
-          loading={loading}
-          error={error}
-          dataSource={dataSource}
-          isAuthenticated={isAuthenticated}
-          onUpdateApplication={updateApplication}
-          onCreateLabel={createLabel}
-          onUpdateLabel={updateLabel}
-          onDeleteLabel={deleteLabel}
-          onClearExamples={clearExamples}
-          onResetExamples={resetToExamples}
-          onSyncToAccount={handleSyncToAccount}
-          syncing={syncing}
-          onCalendarSynced={applySyncedApplications}
-        />
-      </main>
+        <div className="app-shell__main">
+          <header className="header">
+            <div className="header__brand">
+              <div className="header__icon header__icon--mobile-only">
+                <Briefcase size={22} />
+              </div>
+              <div>
+                <h1 className="header__wordmark header__wordmark--desktop-hide">Career OS</h1>
+                <p>
+                  {activePillar
+                    ? `${activePillar.label}. Understand where you want to go, track every opportunity, and prepare with context.`
+                    : 'Understand where you want to go, track every opportunity, and prepare with context.'}
+                </p>
+              </div>
+            </div>
+            <div className="header__meta">
+              <span className={`mode-badge ${aiEnabled ? 'mode-badge--ai' : ''}`}>
+                {aiEnabled ? 'AI parsing on' : 'Heuristic mode'}
+              </span>
+              <AuthPanel />
+              <button type="button" className="icon-btn" onClick={refresh} aria-label="Refresh">
+                <RefreshCw size={18} className={loading ? 'spin' : undefined} />
+              </button>
+            </div>
+          </header>
+
+          <div className="pillars-strip-wrap">
+            <PillarsStrip activeNav={activeNav} onNavigate={setActiveNav} />
+          </div>
+
+          <main className="main">
+            {error && activeNav !== 'opportunities' && (
+              <PageError message={error} onRetry={refresh} />
+            )}
+            {showPipelineLoading && activeNav !== 'opportunities' ? (
+              <PageLoading label="Loading your career workspace…" />
+            ) : activeNav === 'today' ? (
+              <Today
+                applications={applications}
+                profile={career.profile}
+                direction={career.direction}
+                onNavigate={setActiveNav}
+                onContinuePrep={handleContinuePrep}
+              />
+            ) : activeNav === 'opportunities' ? (
+              <>
+                <div className="ui-block ui-block--capture">
+                  <VoiceDump
+                    onSubmit={handleJobVoiceSubmit}
+                    processing={jobVoiceProcessing}
+                    currentArea="jobs"
+                  />
+                  {jobVoiceSummary && (
+                    <div className={`toast${jobVoiceSummary.startsWith('Error:') ? ' toast--error' : ''}`} role="status">
+                      {jobVoiceSummary}
+                    </div>
+                  )}
+                </div>
+
+                <JobTrackerArea
+                  applications={applications}
+                  labels={labels}
+                  loading={loading}
+                  error={error}
+                  dataSource={dataSource}
+                  isAuthenticated={isAuthenticated}
+                  onUpdateApplication={updateApplication}
+                  onCreateLabel={createLabel}
+                  onUpdateLabel={updateLabel}
+                  onDeleteLabel={deleteLabel}
+                  onClearExamples={clearExamples}
+                  onResetExamples={resetToExamples}
+                  onSyncToAccount={handleSyncToAccount}
+                  syncing={syncing}
+                  onCalendarSynced={applySyncedApplications}
+                  focusCompanyId={opportunityFocus?.appId || null}
+                  focusWorkspaceTab={opportunityFocus?.tab || 'prep'}
+                  onFocusConsumed={() => setOpportunityFocus(null)}
+                  profile={career.profile}
+                  direction={career.direction}
+                  onLearningFromReflection={career.addLearningFromReflection}
+                />
+              </>
+            ) : activeNav === 'direction' ? (
+              <CareerDirection
+                profile={career.profile}
+                importResume={career.importResume}
+                updateSnapshot={career.updateSnapshot}
+                updateReflection={career.updateReflection}
+                generatePaths={career.generatePaths}
+                selectPaths={career.selectPaths}
+                updateAssumptions={career.updateAssumptions}
+              />
+            ) : activeNav === 'interview' ? (
+              <InterviewPrep
+                applications={applications}
+                profile={career.profile}
+                direction={career.direction}
+                onContinuePrep={handleContinuePrep}
+                onUpdateApplication={updateApplication}
+                onNavigate={setActiveNav}
+              />
+            ) : activeNav === 'learning' ? (
+              <Learning
+                applications={applications}
+                profile={career.profile}
+                direction={career.direction}
+                onNavigate={setActiveNav}
+              />
+            ) : null}
+          </main>
+        </div>
+      </div>
+
+      <nav className="mobile-nav" aria-label="Primary">
+        {renderNavButtons('mobile-nav')}
+      </nav>
     </div>
   );
 }

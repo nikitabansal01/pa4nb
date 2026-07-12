@@ -189,7 +189,7 @@ function ProcessEditor({ steps, onSave, onCancel }) {
   );
 }
 
-export default function ApplicationCard({ app, onUpdate }) {
+export default function ApplicationCard({ app, onUpdate, onOpen }) {
   const [editingProcess, setEditingProcess] = useState(false);
   const { steps, index, currentLabel, total } = getProcess(app);
   const closed = isClosedStatus(app.status);
@@ -246,7 +246,18 @@ export default function ApplicationCard({ app, onUpdate }) {
       <header className="app-card__header">
         <div className="app-card__identity">
           <div className="app-card__title-row">
-            <h3>{app.company || 'Unknown company'}</h3>
+            {onOpen ? (
+              <button
+                type="button"
+                className="app-card__open"
+                onClick={onOpen}
+                aria-label={`Open workspace for ${app.company || 'company'}`}
+              >
+                <h3>{app.company || 'Unknown company'}</h3>
+              </button>
+            ) : (
+              <h3>{app.company || 'Unknown company'}</h3>
+            )}
             {app.isExample && <span className="example-badge">Example</span>}
           </div>
           {app.positionTitle && <p className="app-card__role">{app.positionTitle}</p>}

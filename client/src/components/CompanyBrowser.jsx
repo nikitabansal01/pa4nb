@@ -14,6 +14,7 @@ import {
   relativeTime,
 } from '../constants';
 import { filterCompanies } from '../utils/companyFilters';
+import EmptyState from './EmptyState';
 
 const EMPTY_FILTERS = {
   industry: '',
@@ -172,7 +173,7 @@ function LabelsCell({ app, labels, onToggle }) {
   );
 }
 
-function CompanyTableRow({ app, labels, onUpdate, hideColumn }) {
+function CompanyTableRow({ app, labels, onUpdate, onOpen, hideColumn }) {
   const statusColor = STATUS_COLORS[app.status] || '#6B7280';
   const selectedIds = app.labelIds || [];
 
@@ -194,11 +195,27 @@ function CompanyTableRow({ app, labels, onUpdate, hideColumn }) {
   return (
     <tr className="company-table__row">
       <th scope="row" className="company-table__company">
-        <span className="company-table__company-name">
-          {app.company || 'Unknown'}
-          {app.isExample && <span className="example-badge example-badge--table">Example</span>}
-        </span>
-        <span className="company-table__updated">{relativeTime(app.updatedAt)}</span>
+        {onOpen ? (
+          <button
+            type="button"
+            className="company-table__open"
+            onClick={() => onOpen(app.id)}
+          >
+            <span className="company-table__company-name">
+              {app.company || 'Unknown'}
+              {app.isExample && <span className="example-badge example-badge--table">Example</span>}
+            </span>
+            <span className="company-table__updated">{relativeTime(app.updatedAt)}</span>
+          </button>
+        ) : (
+          <>
+            <span className="company-table__company-name">
+              {app.company || 'Unknown'}
+              {app.isExample && <span className="example-badge example-badge--table">Example</span>}
+            </span>
+            <span className="company-table__updated">{relativeTime(app.updatedAt)}</span>
+          </>
+        )}
       </th>
       <td className="company-table__cell company-table__cell--muted company-table__cell--role">
         {app.positionTitle || '—'}
@@ -270,7 +287,7 @@ function CompanyTableRow({ app, labels, onUpdate, hideColumn }) {
   );
 }
 
-export default function CompanyBrowser({ applications, labels = [], onUpdate }) {
+export default function CompanyBrowser({ applications, labels = [], onUpdate, onOpenCompany }) {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [groupBy, setGroupBy] = useState('');
 
@@ -361,10 +378,13 @@ export default function CompanyBrowser({ applications, labels = [], onUpdate }) 
 
       <div className="company-table-wrap">
         {filtered.length === 0 ? (
-          <div className="empty-state">
-            <p>No companies match your filters.</p>
-            <p>Try adjusting filters or add companies via voice dump.</p>
-          </div>
+          <EmptyState
+            compact
+            title="No companies match your filters"
+            body="Try clearing filters or add companies with a voice update."
+            actionLabel={hasFilters ? 'Clear filters' : undefined}
+            onAction={hasFilters ? () => setFilters(EMPTY_FILTERS) : undefined}
+          />
         ) : (
           <table className="company-table">
             <thead>
@@ -398,6 +418,7 @@ export default function CompanyBrowser({ applications, labels = [], onUpdate }) 
                       app={app}
                       labels={labels}
                       onUpdate={onUpdate}
+                      onOpen={onOpenCompany}
                       hideColumn={hideColumn}
                     />
                   ))}

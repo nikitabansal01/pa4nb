@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LayoutGrid, Building2, Settings } from 'lucide-react';
 import Dashboard from './Dashboard';
 import CompanyBrowser from './CompanyBrowser';
+import CompanyWorkspace from './CompanyWorkspace';
 import DataSourceBanner from './DataSourceBanner';
 import LabelsSettingsOverlay from './LabelsSettingsOverlay';
 import GoogleCalendarPanel from './GoogleCalendarPanel';
+import { PageError, PageLoading } from './PageStatus';
 
 export default function JobTrackerArea({
   applications,
@@ -23,18 +25,57 @@ export default function JobTrackerArea({
   syncing,
   nested = false,
   onCalendarSynced,
+  focusCompanyId = null,
+  focusWorkspaceTab = 'overview',
+  onFocusConsumed,
+  profile = null,
+  direction = null,
+  onLearningFromReflection,
 }) {
   const [jobTab, setJobTab] = useState('pipeline');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [selectedAppId, setSelectedAppId] = useState(null);
+  const [workspaceTab, setWorkspaceTab] = useState('overview');
   const activeCount = applications.filter((a) => !['rejected', 'withdrawn'].includes(a.status)).length;
+
+  const selectedApp = useMemo(
+    () => applications.find((app) => app.id === selectedAppId) || null,
+    [applications, selectedAppId]
+  );
+
+  useEffect(() => {
+    if (!focusCompanyId) return;
+    setSelectedAppId(focusCompanyId);
+    setWorkspaceTab(focusWorkspaceTab || 'prep');
+    onFocusConsumed?.();
+  }, [focusCompanyId, focusWorkspaceTab, onFocusConsumed]);
+
+  const openWorkspace = (appId, tab = 'overview') => {
+    setSelectedAppId(appId);
+    setWorkspaceTab(tab);
+  };
+
+  if (selectedApp) {
+    return (
+      <CompanyWorkspace
+        app={selectedApp}
+        initialTab={workspaceTab}
+        onBack={() => setSelectedAppId(null)}
+        onUpdate={onUpdateApplication}
+        profile={profile}
+        direction={direction}
+        onLearningFromReflection={onLearningFromReflection}
+      />
+    );
+  }
 
   return (
     <section className={`job-tracker-area ${nested ? 'job-tracker-area--nested' : ''} job-tracker-area--focus`}>
       {!nested && (
         <header className="ui-section ui-section--header job-tracker-area__intro">
-          <h2>Job search</h2>
+          <h2>Opportunities</h2>
           <p>
-            Your pipeline at a glance — voice-dump interviews, status changes, and next steps to keep everything current.
+            Track every opportunity in your pipeline — the same tracker, now connected to your career direction and interview prep.
           </p>
         </header>
       )}
@@ -93,21 +134,23 @@ export default function JobTrackerArea({
         quiet
       />
 
-      {error && <div className="error-banner">{error}</div>}
+      {error && <PageError message={error} />}
 
       {loading ? (
-        <div className="loading">Loading your pipeline…</div>
+        <PageLoading label="Loading your pipeline…" />
       ) : jobTab === 'companies' ? (
         <CompanyBrowser
           applications={applications}
           labels={labels}
           onUpdate={onUpdateApplication}
+          onOpenCompany={openWorkspace}
         />
       ) : (
         <Dashboard
           applications={applications}
           labels={labels}
           onUpdate={onUpdateApplication}
+          onOpenCompany={openWorkspace}
         />
       )}
 

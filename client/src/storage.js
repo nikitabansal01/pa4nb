@@ -1,6 +1,17 @@
+import {
+  createEmptyCareerProfile,
+  normalizeCareerProfile,
+  selectionFromLegacyDirection,
+} from './careerProfile';
+
 const STORAGE_KEY = 'pa-for-nb-applications';
 const LABELS_KEY = 'pa-for-nb-labels';
 const META_KEY = 'pa-for-nb-meta';
+const DIRECTION_KEY = 'career-os-direction';
+const PROFILE_KEY = 'career-os-profile';
+const STORY_BANK_KEY = 'career-os-story-bank';
+const PRACTICED_QUESTIONS_KEY = 'career-os-practiced-questions';
+const LEARNING_PLAN_KEY = 'career-os-learning-plan';
 
 export const DEFAULT_LABEL_NAME = 'Referral requested';
 
@@ -86,6 +97,102 @@ export function isShowingExamples(applications) {
 
 export function stripExamples(applications) {
   return Array.isArray(applications) ? applications.filter((a) => !a.isExample) : [];
+}
+
+export function getCareerProfile() {
+  const raw = localStorage.getItem(PROFILE_KEY);
+  if (raw) {
+    try {
+      return normalizeCareerProfile(JSON.parse(raw));
+    } catch {
+      // fall through
+    }
+  }
+
+  const legacyRaw = localStorage.getItem(DIRECTION_KEY);
+  if (legacyRaw) {
+    try {
+      const legacy = JSON.parse(legacyRaw);
+      const selection = selectionFromLegacyDirection(legacy);
+      if (selection) {
+        const migrated = normalizeCareerProfile({ selection });
+        saveCareerProfile(migrated);
+        return migrated;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return createEmptyCareerProfile();
+}
+
+export function saveCareerProfile(profile) {
+  const normalized = normalizeCareerProfile(profile);
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(normalized));
+  if (normalized.selection?.primaryTitle) {
+    localStorage.setItem(DIRECTION_KEY, JSON.stringify(normalized.selection));
+  }
+  return normalized;
+}
+
+/** Prefer getCareerProfile().selection via useCareerProfile. */
+export function getDirectionSelection() {
+  const selection = getCareerProfile().selection;
+  return selection?.primaryTitle ? selection : null;
+}
+
+/** Prefer useCareerProfile path selection helpers. */
+export function saveDirectionSelection(selection) {
+  const profile = getCareerProfile();
+  saveCareerProfile({
+    ...profile,
+    selection: { ...profile.selection, ...selection },
+  });
+}
+
+export function getStoryBank() {
+  const raw = localStorage.getItem(STORY_BANK_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+export function saveStoryBank(bank) {
+  localStorage.setItem(STORY_BANK_KEY, JSON.stringify(bank));
+}
+
+export function getPracticedQuestions() {
+  const raw = localStorage.getItem(PRACTICED_QUESTIONS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export function savePracticedQuestions(questions) {
+  localStorage.setItem(PRACTICED_QUESTIONS_KEY, JSON.stringify(questions));
+}
+
+export function getLearningPlanStatuses() {
+  const raw = localStorage.getItem(LEARNING_PLAN_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveLearningPlanStatuses(statuses) {
+  localStorage.setItem(LEARNING_PLAN_KEY, JSON.stringify(statuses));
 }
 
 export function mergeApplications(existing, incoming) {

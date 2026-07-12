@@ -1,0 +1,318 @@
+import { useMemo, useState } from 'react';
+import {
+  CalendarClock,
+  CheckSquare,
+  Library,
+  MessageSquare,
+  ArrowRight,
+  Sparkles,
+} from 'lucide-react';
+import { STATUS_COLORS } from '../constants';
+import {
+  getPracticedQuestions,
+  getStoryBank,
+  savePracticedQuestions,
+  saveStoryBank,
+} from '../storage';
+import { getCareerDirectionSnapshot } from '../utils/todayInsights';
+import {
+  buildPersonalizedStoryBank,
+  getIncompletePrepTasks,
+  getRecentlyPracticedQuestions,
+  getUpcomingInterviewCards,
+  STORY_GROUPS,
+} from '../utils/interviewPrepHub';
+import { getWorkspace } from '../utils/companyWorkspace';
+import EmptyState from './EmptyState';
+
+export default function InterviewPrep({
+  applications = [],
+  profile = null,
+  direction: directionProp,
+  onContinuePrep,
+  onUpdateApplication,
+  onNavigate,
+}) {
+  const direction = directionProp || getCareerDirectionSnapshot(profile);
+  const [practiced, setPracticed] = useState(() => getPracticedQuestions());
+  const [savedBank, setSavedBank] = useState(() => getStoryBank());
+
+  const interviews = useMemo(
+    () => getUpcomingInterviewCards(applications, profile),
+    [applications, profile]
+  );
+  const incompleteTasks = useMemo(
+    () => getIncompletePrepTasks(applications, { profile }),
+    [applications, profile]
+  );
+  const recentQuestions = useMemo(
+    () => getRecentlyPracticedQuestions(applications, practiced),
+    [applications, practiced]
+  );
+  const storyBank = useMemo(
+    () => buildPersonalizedStoryBank(applications, profile || direction, savedBank),
+    [applications, profile, direction, savedBank]
+  );
+
+  const pathLabel = direction?.primaryTitle || 'your target path';
+
+  const markPracticed = (item) => {
+    const entry = {
+      id: item.id || `q-${Date.now()}`,
+      question: item.question,
+      company: item.company,
+      pathHint: direction?.primaryTitle || item.pathHint || 'Target path',
+      practicedAt: new Date().toISOString(),
+    };
+    const next = [entry, ...practiced.filter((q) => q.question !== entry.question)].slice(0, 20);
+    setPracticed(next);
+    savePracticedQuestions(next);
+
+    const app = applications.find((a) => a.company === item.company || a.id === item.appId);
+    if (app && onUpdateApplication) {
+      const workspace = getWorkspace(app);
+      onUpdateApplication(app.id, {
+        workspace: {
+          ...workspace,
+          interviewPrep: {
+            ...(workspace.interviewPrep || {}),
+            practiced: true,
+            lastPracticedAt: entry.practicedAt,
+          },
+        },
+      });
+    }
+  };
+
+  const updateStory = (groupId, field, value) => {
+    const next = {
+      ...(savedBank || {}),
+      [groupId]: {
+        ...(savedBank?.[groupId] || {}),
+        [field]: value,
+      },
+    };
+    setSavedBank(next);
+    saveStoryBank(next);
+  };
+
+  return (
+    <section className="interview-hub page-section">
+      <header className="ui-section ui-section--header interview-hub__intro">
+        <h2>Interview Prep</h2>
+        <p>
+          Active prep across companies, personalized to your resume evidence and{' '}
+          <strong>{pathLabel}</strong>.
+        </p>
+      </header>
+
+      <div className="interview-hub__grid">
+        <section className="os-card interview-hub__main">
+          <div className="os-card__header interview-hub__section-head">
+            <CalendarClock size={18} />
+            <div>
+              <h3>Upcoming interviews</h3>
+              <p>Ordered by date — continue where you left off</p>
+            </div>
+          </div>
+
+          {interviews.length === 0 ? (
+            <EmptyState
+              compact
+              title="No active interview prep yet"
+              body="When opportunities move into screens or onsites, they appear here with progress and next tasks."
+              actionLabel="Track opportunities"
+              onAction={() => onNavigate?.('opportunities')}
+            />
+          ) : (
+            <div className="interview-card-list">
+              {interviews.map((item) => {
+                const accent = STATUS_COLORS[item.status] || 'var(--accent-cyan)';
+                return (
+                  <article
+                    key={item.id}
+                    className="interview-card"
+                    style={{ '--interview-accent': accent }}
+                  >
+                    <div className="interview-card__top">
+                      <div>
+                        <h4>{item.company}</h4>
+                        <p>{item.role}</p>
+                      </div>
+                      <span className="interview-card__stage">{item.stage}</span>
+                    </div>
+
+                    <dl className="interview-card__meta">
+                      <div>
+                        <dt>Interview date</dt>
+                        <dd>{item.whenLabel}</dd>
+                      </div>
+                      <div>
+                        <dt>Prep completion</dt>
+                        <dd>{item.progress}%</dd>
+                      </div>
+                    </dl>
+
+                    <div
+                      className="interview-card__progress"
+                      role="progressbar"
+                      aria-valuenow={item.progress}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`${item.company} prep completion`}
+                    >
+                      <div style={{ width: `${item.progress}%` }} />
+                    </div>
+
+                    <p className="interview-card__next">
+                      <span>Next</span>
+                      {item.nextTask}
+                    </p>
+
+                    <button
+                      type="button"
+                      className="submit-btn interview-card__cta"
+                      onClick={() => onContinuePrep?.(item.id)}
+                    >
+                      Continue prep
+                      <ArrowRight size={16} />
+                    </button>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        <aside className="interview-hub__side">
+          <article className="os-card interview-hub__card">
+            <div className="os-card__header interview-hub__section-head">
+              <CheckSquare size={18} />
+              <div>
+                <h3>Incomplete tasks</h3>
+                <p>Across all active interviews</p>
+              </div>
+            </div>
+            {incompleteTasks.length === 0 ? (
+              <EmptyState
+                compact
+                title="All prep tasks complete"
+                body="You’re caught up on checklists for active interviews."
+              />
+            ) : (
+              <ul className="interview-task-list">
+                {incompleteTasks.map((task) => (
+                  <li key={task.id}>
+                    <button type="button" onClick={() => onContinuePrep?.(task.appId)}>
+                      <strong>{task.label}</strong>
+                      <span>
+                        {task.company} · {task.whenLabel}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+
+          <article className="os-card interview-hub__card">
+            <div className="os-card__header interview-hub__section-head">
+              <MessageSquare size={18} />
+              <div>
+                <h3>Recently practiced questions</h3>
+                <p>Pulled from your company loops</p>
+              </div>
+            </div>
+            {recentQuestions.length === 0 ? (
+              <EmptyState
+                compact
+                title="No practiced questions yet"
+                body="Mark questions as practiced from a company prep workspace, or start with the ready-to-practice list when interviews are active."
+                actionLabel="Track opportunities"
+                onAction={() => onNavigate?.('opportunities')}
+              />
+            ) : (
+              <ul className="interview-question-list">
+                {recentQuestions.map((item) => (
+                  <li key={item.id}>
+                    <p>{item.question}</p>
+                    <div className="interview-question-list__meta">
+                      <span>
+                        {item.company}
+                        {item.readyOnly ? ' · ready to practice' : ''}
+                      </span>
+                      <button type="button" className="auth-btn" onClick={() => markPracticed(item)}>
+                        {item.readyOnly ? 'Mark practiced' : 'Practice again'}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
+        </aside>
+      </div>
+
+      <section className="os-card interview-hub__card interview-hub__story-bank">
+        <div className="os-card__header interview-hub__section-head">
+          <Library size={18} />
+          <div>
+            <h3>Reusable story bank</h3>
+            <p>
+              Personalized to {pathLabel}
+              {direction?.focusAreas?.length
+                ? ` · focus: ${direction.focusAreas.slice(0, 2).join(', ')}`
+                : ''}
+              . Edit angles with your real evidence — not generic library blurbs.
+            </p>
+          </div>
+        </div>
+
+        <div className="story-bank-grid">
+          {storyBank.map((story) => (
+            <article key={story.id} className="story-bank-card">
+              <div className="story-bank-card__top">
+                <h4>{story.label}</h4>
+                <span>
+                  <Sparkles size={12} />
+                  For {story.path}
+                </span>
+              </div>
+              <label className="career-direction__field">
+                <span>Story</span>
+                <textarea
+                  className="compass-field__input"
+                  rows={2}
+                  value={story.prompt}
+                  onChange={(e) => updateStory(story.id, 'prompt', e.target.value)}
+                />
+              </label>
+              <label className="career-direction__field">
+                <span>Angle for this path</span>
+                <textarea
+                  className="compass-field__input"
+                  rows={2}
+                  value={story.angle}
+                  onChange={(e) => updateStory(story.id, 'angle', e.target.value)}
+                />
+              </label>
+              <label className="career-direction__field">
+                <span>Resume evidence</span>
+                <textarea
+                  className="compass-field__input"
+                  rows={2}
+                  value={story.evidence}
+                  onChange={(e) => updateStory(story.id, 'evidence', e.target.value)}
+                />
+              </label>
+            </article>
+          ))}
+        </div>
+
+        <p className="interview-hub__story-note">
+          Groups covered: {STORY_GROUPS.map((g) => g.label).join(' · ')}
+        </p>
+      </section>
+    </section>
+  );
+}
