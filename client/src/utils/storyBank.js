@@ -51,18 +51,19 @@ function filled(value) {
   return Boolean(String(value || '').trim());
 }
 
-function emptyStar() {
-  return { situation: '', task: '', action: '', result: '' };
+function emptyStarr() {
+  return { situation: '', task: '', action: '', result: '', reflection: '' };
 }
 
 export function createStoryVersion(partial = {}) {
-  const star = { ...emptyStar(), ...partial };
+  const starr = { ...emptyStarr(), ...partial };
   return {
     id: partial.id || uid('ver'),
-    situation: star.situation || '',
-    task: star.task || '',
-    action: star.action || '',
-    result: star.result || '',
+    situation: starr.situation || '',
+    task: starr.task || '',
+    action: starr.action || '',
+    result: starr.result || '',
+    reflection: starr.reflection || '',
     feedback: partial.feedback || '',
     feedbackAt: partial.feedbackAt || null,
     updatedAt: partial.updatedAt || new Date().toISOString(),
@@ -95,6 +96,7 @@ function starFromLegacy(saved = {}) {
     task: angle,
     action: evidence,
     result: '',
+    reflection: '',
   });
 }
 
@@ -146,6 +148,7 @@ function normalizeStory(story) {
         task: story.task,
         action: story.action,
         result: story.result,
+        reflection: story.reflection,
         feedback: story.feedback,
       })];
   const activeVersionId = versions.some((v) => v.id === story.activeVersionId)
@@ -177,12 +180,12 @@ export function getActiveVersion(story) {
 }
 
 export function starCompleteness(version) {
-  const fields = ['situation', 'task', 'action', 'result'];
+  const fields = ['situation', 'task', 'action', 'result', 'reflection'];
   const filledCount = fields.filter((f) => filled(version?.[f])).length;
-  return { filledCount, total: fields.length, percent: Math.round((filledCount / 4) * 100) };
+  return { filledCount, total: fields.length, percent: Math.round((filledCount / fields.length) * 100) };
 }
 
-/** Lightweight local “AI” feedback on STAR quality. */
+/** Lightweight local “AI” feedback on STARR quality. */
 export function generateStoryFeedback(story, version) {
   const tips = [];
   const s = version || getActiveVersion(story);
@@ -199,14 +202,17 @@ export function generateStoryFeedback(story, version) {
     tips.push('Actions should center on what you did (“I…”) so ownership is clear.');
   }
 
-  if (!filled(s.result)) tips.push('Close with a Result: outcome, metric, or learning.');
+  if (!filled(s.result)) tips.push('Close with a Result: outcome, metric, or lasting change.');
   else if (!/\d|%|x\b|retained|grew|reduced|shipped|launched|saved|improved/i.test(s.result)) {
     tips.push('Result could be sharper — add a metric, decision, or lasting change.');
   }
 
+  if (!filled(s.reflection)) {
+    tips.push('Add Reflection: what you’d do differently, and why this story matters for your target role.');
+  }
+
   if (tips.length === 0) {
-    tips.push(`Solid STAR skeleton for ${competency}. Tighten the turning point and rehearse a 90-second cut.`);
-    tips.push('Optional: add a one-line “so what” that maps this story to your target direction.');
+    tips.push(`Solid STARR skeleton for ${competency}. Tighten the turning point and rehearse a 90-second cut.`);
   }
 
   return {
@@ -252,6 +258,7 @@ export function seedStoriesForPath(profileOrSelection, existingStories = []) {
       task: seed.task,
       action: '',
       result: '',
+      reflection: '',
     });
     return {
       id: uid('seed'),

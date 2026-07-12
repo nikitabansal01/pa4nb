@@ -242,7 +242,7 @@ export default function InterviewPrep({
           <Library size={18} />
           <div>
             <h3>Behavioral Story Bank</h3>
-            <p>Reusable STAR stories live in Learning.</p>
+            <p>Reusable STARR stories live in Learning.</p>
           </div>
         </div>
         <button type="button" className="auth-btn auth-btn--primary" onClick={openStoryBank}>

@@ -176,6 +176,7 @@ function StoryEditor({ story, onChange, onDelete }) {
       task: version.task,
       action: version.action,
       result: version.result,
+      reflection: version.reflection,
     });
     patchStory({
       versions: [...story.versions, next],
@@ -211,7 +212,7 @@ function StoryEditor({ story, onChange, onDelete }) {
           <p className="story-workspace__meta">
             {competency?.label}
             {' · '}
-            STAR {completeness.filledCount}/4
+            STARR {completeness.filledCount}/5
           </p>
         </div>
         <div className="story-workspace__card-actions">
@@ -265,12 +266,13 @@ function StoryEditor({ story, onChange, onDelete }) {
           ['task', 'Task'],
           ['action', 'Action'],
           ['result', 'Result'],
+          ['reflection', 'Reflection'],
         ].map(([key, label]) => (
           <label key={key} className="story-workspace__field">
             <span>{label}</span>
             <textarea
               className="compass-field__input"
-              rows={key === 'action' ? 3 : 2}
+              rows={key === 'action' || key === 'reflection' ? 3 : 2}
               value={version[key] || ''}
               onChange={(e) => patchVersion({ [key]: e.target.value })}
             />
