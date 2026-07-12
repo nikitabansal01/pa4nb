@@ -16,8 +16,12 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
+    "mammoth": "^1.12.0",
+    "multer": "^2.2.0",
     "openai": "^4.77.0",
-    "uuid": "^11.0.3"
+    "unpdf": "^1.6.2",
+    "uuid": "^11.0.3",
+    "word-extractor": "^1.0.4"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

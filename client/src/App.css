@@ -3375,109 +3375,41 @@
   font-size: 0.9rem;
 }
 
-.career-direction__lanes {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 1.15rem;
-}
-
-.career-direction__lane {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.85rem 0.95rem;
-  border-radius: 14px;
-  min-width: 0;
-}
-
-.career-direction__lane--got {
-  background: color-mix(in srgb, var(--accent-cyan) 10%, rgba(0, 0, 0, 0.22));
-  border: 1px solid color-mix(in srgb, var(--accent-cyan) 38%, transparent);
-  box-shadow: inset 3px 0 0 var(--accent-cyan);
-}
-
-.career-direction__lane--need {
-  background: color-mix(in srgb, var(--accent-yellow) 12%, rgba(0, 0, 0, 0.22));
-  border: 1px solid color-mix(in srgb, var(--accent-yellow) 42%, transparent);
-  box-shadow: inset 3px 0 0 var(--accent-yellow);
-}
-
-.career-direction__lane-head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.career-direction__lane-kicker {
-  font-size: 0.72rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.career-direction__lane--got .career-direction__lane-kicker {
-  color: var(--accent-cyan);
-}
-
-.career-direction__lane--need .career-direction__lane-kicker {
-  color: var(--accent-yellow);
-}
-
-.career-direction__lane-sub {
-  margin: 0;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
-.career-direction__parse-empty {
-  font-size: 0.82rem;
+.career-direction__parse-note {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  line-height: 1.45;
   color: var(--text-muted);
 }
 
-.career-direction__parse-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  min-width: 0;
+.career-direction__parse-note-got {
+  color: var(--text-muted);
 }
 
-.career-direction__chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.28rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+.career-direction__parse-note-need {
+  color: color-mix(in srgb, var(--text) 78%, var(--accent-yellow));
+}
+
+.career-direction__parse-link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
   font-weight: 600;
-  line-height: 1.2;
-  border: 1px solid transparent;
-}
-
-.career-direction__chip--ai {
-  color: color-mix(in srgb, var(--text) 92%, var(--accent-cyan));
-  background: color-mix(in srgb, var(--accent-cyan) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent-cyan) 32%, transparent);
-  cursor: default;
-}
-
-button.career-direction__chip--you {
-  color: #1a1408;
-  background: color-mix(in srgb, var(--accent-yellow) 82%, white);
-  border-color: color-mix(in srgb, var(--accent-yellow) 55%, transparent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
-  transition: filter 0.15s, transform 0.15s;
 }
 
-button.career-direction__chip--you:hover {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
+.career-direction__parse-link:hover {
+  color: var(--accent-yellow);
 }
 
 .career-direction__field-label {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
   font-size: 0.75rem;
   font-weight: 600;
@@ -3486,101 +3418,27 @@ button.career-direction__chip--you:hover {
 
 .career-direction__field-badge {
   font-style: normal;
-  font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  padding: 0.12rem 0.4rem;
-  border-radius: 999px;
-  border: 1px solid transparent;
-}
-
-.career-direction__field-badge--from-resume {
-  color: var(--accent-cyan);
-  background: color-mix(in srgb, var(--accent-cyan) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent-cyan) 30%, transparent);
-}
-
-.career-direction__field-badge--review {
   color: var(--accent-yellow);
-  background: color-mix(in srgb, var(--accent-yellow) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent-yellow) 36%, transparent);
-}
-
-.career-direction__field-badge--add {
-  color: color-mix(in srgb, var(--accent-magenta) 80%, white);
-  background: color-mix(in srgb, var(--accent-magenta) 16%, transparent);
-  border-color: color-mix(in srgb, var(--accent-magenta) 34%, transparent);
-}
-
-.career-direction__field-badge--yours {
-  color: color-mix(in srgb, var(--accent-lime) 85%, white);
-  background: color-mix(in srgb, var(--accent-lime) 14%, transparent);
-  border-color: color-mix(in srgb, var(--accent-lime) 32%, transparent);
 }
 
 .career-direction__field-hint {
   font-size: 0.74rem;
-  color: color-mix(in srgb, var(--accent-yellow) 70%, var(--text-muted));
+  color: var(--text-muted);
   line-height: 1.3;
   margin-top: -0.15rem;
 }
 
-.career-direction__field--from-resume .compass-field__input {
-  border-color: color-mix(in srgb, var(--accent-cyan) 36%, var(--border));
-  background: color-mix(in srgb, var(--accent-cyan) 7%, rgba(0, 0, 0, 0.22));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-cyan) 70%, transparent);
-}
-
-.career-direction__field--review .compass-field__input {
-  border-color: color-mix(in srgb, var(--accent-yellow) 48%, var(--border));
-  background: color-mix(in srgb, var(--accent-yellow) 8%, rgba(0, 0, 0, 0.22));
-  box-shadow: inset 3px 0 0 var(--accent-yellow);
-}
-
+.career-direction__field--review .compass-field__input,
 .career-direction__field--add .compass-field__input {
-  border-style: dashed;
-  border-color: color-mix(in srgb, var(--accent-magenta) 42%, var(--border));
-  background: color-mix(in srgb, var(--accent-magenta) 6%, rgba(0, 0, 0, 0.28));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-magenta) 65%, transparent);
-}
-
-.career-direction__field--yours .compass-field__input {
-  border-color: color-mix(in srgb, var(--accent-lime) 38%, var(--border));
-  background: color-mix(in srgb, var(--accent-lime) 6%, rgba(0, 0, 0, 0.22));
-  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent-lime) 70%, transparent);
+  border-color: color-mix(in srgb, var(--accent-yellow) 28%, var(--border));
 }
 
 .career-direction__field--focused .compass-field__input {
-  outline: 1px solid color-mix(in srgb, var(--accent-violet) 45%, transparent);
-}
-
-.career-direction__write-kicker {
-  display: block;
-  margin-bottom: 0.2rem;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent-yellow);
-}
-
-.career-direction__reflection--write {
-  border-color: color-mix(in srgb, var(--accent-yellow) 34%, var(--border));
-  background:
-    linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--accent-yellow) 10%, transparent),
-      transparent 42%
-    ),
-    var(--surface-elevated, rgba(0, 0, 0, 0.22));
-  box-shadow: inset 0 3px 0 color-mix(in srgb, var(--accent-yellow) 55%, transparent);
-}
-
-.career-direction__reflection--write .compass-field__input {
-  border-style: solid;
-  border-color: color-mix(in srgb, var(--accent-yellow) 28%, var(--border));
-  min-height: 6.5rem;
+  border-color: color-mix(in srgb, var(--accent-violet) 40%, var(--border));
 }
 
 .career-direction__snapshot-grid {
@@ -3597,12 +3455,6 @@ button.career-direction__chip--you:hover {
 
 .career-direction__field:nth-child(n + 3) {
   grid-column: 1 / -1;
-}
-
-@media (max-width: 720px) {
-  .career-direction__lanes {
-    grid-template-columns: 1fr;
-  }
 }
 
 .career-direction__question {

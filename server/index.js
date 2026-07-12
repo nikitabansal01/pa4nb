@@ -49,11 +49,17 @@ import {
 } from './calendarSync.js';
 import { recommendCareerRoutes } from './careerIntelligence.js';
 import { parseCareerResume } from './resumeParse.js';
+import { extractResumeTextFromFile, RESUME_UPLOAD_ACCEPT } from './resumeExtract.js';
+import multer from 'multer';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const LEGACY_DB = join(__dirname, '..', 'db.json');
+const resumeUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: RESUME_UPLOAD_ACCEPT.maxBytes },
+});
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
@@ -310,27 +316,64 @@ app.post('/api/career/recommend', optionalAuth, async (req, res) => {
   }
 });
 
-app.post('/api/career/parse-resume', optionalAuth, async (req, res) => {
-  try {
-    const { source, text, linkedinUrl, fileName } = req.body || {};
-    const result = await parseCareerResume({
-      source: source === 'linkedin' ? 'linkedin' : 'upload',
-      text: text || '',
-      linkedinUrl: linkedinUrl || '',
-      fileName: fileName || '',
-    });
+app.post(
+  '/api/career/parse-resume',
+  optionalAuth,
+  (req, res, next) => {
+    if (req.is('multipart/form-data')) {
+      return resumeUpload.single('file')(req, res, (err) => {
+        if (err) {
+          const message =
+            err.code === 'LIMIT_FILE_SIZE'
+              ? 'Resume file is too large (max 8MB).'
+              : err.message || 'File upload failed';
+          return res.status(400).json({ error: message });
+        }
+        next();
+      });
+    }
+    next();
+  },
+  async (req, res) => {
+    try {
+      const body = req.body || {};
+      let text = body.text || '';
+      let fileName = body.fileName || '';
+      const linkedinUrl = body.linkedinUrl || '';
+      const source = body.source === 'linkedin' ? 'linkedin' : 'upload';
 
-    res.json({
-      snapshot: result.snapshot,
-      mode: result.mode,
-      warning: result.warning,
-      aiEnabled: Boolean(process.env.OPENAI_API_KEY),
-    });
-  } catch (error) {
-    console.error('Resume parse failed:', error);
-    res.status(500).json({ error: error.message || 'Failed to parse resume' });
+      if (req.file) {
+        fileName = req.file.originalname || fileName;
+        text = await extractResumeTextFromFile({
+          buffer: req.file.buffer,
+          fileName,
+          mimeType: req.file.mimetype,
+        });
+      }
+
+      const result = await parseCareerResume({
+        source,
+        text,
+        linkedinUrl,
+        fileName,
+      });
+
+      res.json({
+        snapshot: result.snapshot,
+        mode: result.mode,
+        warning: result.warning,
+        aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+        extractedChars: text ? String(text).length : 0,
+      });
+    } catch (error) {
+      console.error('Resume parse failed:', error);
+      const status = /unsupported file|empty file|could not read enough/i.test(error.message || '')
+        ? 400
+        : 500;
+      res.status(status).json({ error: error.message || 'Failed to parse resume' });
+    }
   }
-});
+);
 
 app.get('/api/meta', (_req, res) => {
   res.json({

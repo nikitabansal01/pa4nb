@@ -269,9 +269,16 @@ export default function CareerDirection({
     nextFileName,
     nextLinkedinUrl,
     text = '',
+    file = null,
   }) => {
     setImportStatus('loading');
-    setImportMessage(`Reading your ${sourceLabel} with AI…`);
+    setImportMessage(
+      source === 'linkedin'
+        ? 'Fetching LinkedIn profile…'
+        : file
+          ? `Reading ${nextFileName || 'resume'}…`
+          : `Reading your ${sourceLabel} with AI…`
+    );
     setGenerateNote(null);
     setFocusField(null);
 
@@ -280,28 +287,58 @@ export default function CareerDirection({
     let warning = null;
 
     try {
-      const res = await fetch('/api/career/parse-resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          source,
-          fileName: nextFileName || '',
-          linkedinUrl: nextLinkedinUrl || '',
-          text: text || '',
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.snapshot && typeof data.snapshot === 'object') {
-          parsedSnapshot = { ...EMPTY_SNAPSHOT, ...data.snapshot };
-          parseMode = data.mode || 'llm';
-          warning = data.warning || null;
-        }
+      let res;
+      if (file) {
+        const form = new FormData();
+        form.append('source', source);
+        form.append('fileName', nextFileName || file.name || '');
+        form.append('linkedinUrl', nextLinkedinUrl || '');
+        if (text) form.append('text', text);
+        form.append('file', file);
+        res = await fetch('/api/career/parse-resume', {
+          method: 'POST',
+          body: form,
+        });
       } else {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Resume parse failed');
+        res = await fetch('/api/career/parse-resume', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source,
+            fileName: nextFileName || '',
+            linkedinUrl: nextLinkedinUrl || '',
+            text: text || '',
+          }),
+        });
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Resume parse failed');
+      }
+      parseMode = data.mode || 'llm';
+      warning = data.warning || null;
+      if (parseMode === 'error') {
+        setImportStatus('error');
+        setImportMessage(warning || 'Could not parse that LinkedIn profile.');
+        if (nextLinkedinUrl) setLinkedinUrl(nextLinkedinUrl);
+        return;
+      }
+      if (data.snapshot && typeof data.snapshot === 'object') {
+        parsedSnapshot = { ...EMPTY_SNAPSHOT, ...data.snapshot };
       }
     } catch (error) {
+      if (source === 'linkedin' || file) {
+        setImportStatus('error');
+        setImportMessage(
+          error.message
+            || (source === 'linkedin'
+              ? 'Could not import from LinkedIn. Paste About + Experience text instead.'
+              : 'Could not read that resume file. Try PDF/DOCX, or paste the text.')
+        );
+        if (nextLinkedinUrl) setLinkedinUrl(nextLinkedinUrl);
+        if (nextFileName) setFileName(nextFileName);
+        return;
+      }
       warning = error.message || 'AI parse unavailable — using a demo snapshot.';
       parseMode = 'heuristic';
     }
@@ -323,7 +360,7 @@ export default function CareerDirection({
     setImportStatus('success');
 
     if (parseMode === 'llm') {
-      setImportMessage(warning || 'Cyan = from resume. Amber = still need you.');
+      setImportMessage(warning || 'Background extracted.');
     } else {
       setImportMessage(warning || 'Demo snapshot — paste resume text for AI parse.');
     }
@@ -362,13 +399,6 @@ export default function CareerDirection({
     return 'yours';
   }
 
-  const FIELD_STATUS_LABEL = {
-    'from-resume': 'From resume',
-    review: 'Review',
-    add: 'Write new',
-    yours: 'Yours',
-  };
-
   const jumpToReflection = (questionId) => {
     const index = REFLECTION_QUESTIONS.findIndex((q) => q.id === questionId);
     if (index >= 0) setQuestionIndex(index);
@@ -391,34 +421,17 @@ export default function CareerDirection({
 
     setFileName(file.name);
 
-    let text = resumeText.trim();
-    if (ext === 'txt') {
-      try {
-        text = (await file.text()).trim() || text;
-        setResumeText(text);
-      } catch {
-        // keep pasted text if any
-      }
-    } else if (!text) {
-      // Binary formats: prefer pasted text for grounded LLM parse
-      setImportStatus('error');
-      setImportMessage(
-        'PDF/DOCX text extraction is limited here. Paste your resume text below, then click Import from text — or upload a .txt export.'
-      );
-      return;
-    }
-
     try {
       await parseResumeImport({
         source: 'upload',
         sourceLabel: 'resume',
         nextFileName: file.name,
         nextLinkedinUrl: linkedinUrl,
-        text,
+        file,
       });
     } catch {
       setImportStatus('error');
-      setImportMessage('Could not parse that resume. Try pasting text or a LinkedIn URL.');
+      setImportMessage('Could not parse that resume. Try PDF/DOCX, or paste the text.');
     }
   };
 
@@ -426,7 +439,7 @@ export default function CareerDirection({
     const text = resumeText.trim();
     if (!text) {
       setImportStatus('error');
-      setImportMessage('Paste resume text first, or upload a .txt file.');
+      setImportMessage('Paste resume text first, or upload a PDF/DOC/DOCX.');
       return;
     }
     try {
@@ -450,9 +463,9 @@ export default function CareerDirection({
       setImportMessage('Add a LinkedIn profile URL, or upload a resume file.');
       return;
     }
-    if (!/^https?:\/\//i.test(url) && !/linkedin\.com/i.test(url)) {
+    if (!/linkedin\.com\/in\/[^/?#\s]+/i.test(url)) {
       setImportStatus('error');
-      setImportMessage('That does not look like a LinkedIn URL. Check it and try again.');
+      setImportMessage('Use a profile URL like https://linkedin.com/in/your-name');
       return;
     }
 
@@ -467,7 +480,7 @@ export default function CareerDirection({
       });
     } catch {
       setImportStatus('error');
-      setImportMessage('Could not import from LinkedIn. Try pasting resume text instead.');
+      setImportMessage('Could not import from LinkedIn. Paste About + Experience text instead.');
     }
   };
 
@@ -745,7 +758,7 @@ export default function CareerDirection({
             disabled={importStatus === 'loading'}
           >
             {importStatus === 'loading' ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-            Upload .txt
+            Upload resume
           </button>
           <div className="career-direction__linkedin">
             <label htmlFor="linkedin-url">LinkedIn URL</label>
@@ -754,7 +767,9 @@ export default function CareerDirection({
                 <Link2 size={16} />
                 <input
                   id="linkedin-url"
-                  type="url"
+                  type="text"
+                  inputMode="url"
+                  autoComplete="url"
                   value={linkedinUrl}
                   onChange={(e) => setLinkedinUrl(e.target.value)}
                   placeholder="https://linkedin.com/in/…"
@@ -829,77 +844,66 @@ export default function CareerDirection({
         </div>
 
         {insights && (
-          <div className="career-direction__lanes" aria-live="polite">
-            <div className="career-direction__lane career-direction__lane--got">
-              <div className="career-direction__lane-head">
-                <span className="career-direction__lane-kicker">Pulled from resume</span>
-                <p className="career-direction__lane-sub">Confirmed — edit if wrong</p>
-              </div>
-              {insights.signals.length === 0 ? (
-                <span className="career-direction__parse-empty">Nothing solid yet.</span>
-              ) : (
-                <div className="career-direction__parse-chips">
-                  {insights.signals.map((item) => (
-                    <span key={item.id} className="career-direction__chip career-direction__chip--ai">
-                      {item.label || item.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="career-direction__lane career-direction__lane--need">
-              <div className="career-direction__lane-head">
-                <span className="career-direction__lane-kicker">Still need from you</span>
-                <p className="career-direction__lane-sub">Not on the resume — write these</p>
-              </div>
-              {(insights.fieldGaps?.length > 0 || insights.reflectionGap) ? (
-                <div className="career-direction__parse-chips">
-                  {insights.fieldGaps?.map((item) => (
+          <p className="career-direction__parse-note" aria-live="polite">
+            {insights.signals.length > 0 && (
+              <span className="career-direction__parse-note-got">
+                From resume: {insights.signals.map((s) => s.label || s.title).join(' · ')}
+              </span>
+            )}
+            {(insights.fieldGaps?.length > 0 || insights.reflectionGap) && (
+              <span className="career-direction__parse-note-need">
+                {insights.signals.length > 0 ? ' · ' : ''}
+                Needs you:{' '}
+                {insights.fieldGaps?.map((item, i) => (
+                  <span key={item.id}>
+                    {i > 0 ? ', ' : ''}
                     <button
-                      key={item.id}
                       type="button"
-                      className="career-direction__chip career-direction__chip--you"
+                      className="career-direction__parse-link"
                       onClick={() => jumpToSnapshotField(item.field)}
                     >
                       {item.label || item.title}
                     </button>
-                  ))}
-                  {insights.reflectionGap && (
+                  </span>
+                ))}
+                {insights.reflectionGap && (
+                  <>
+                    {insights.fieldGaps?.length ? ', ' : ''}
                     <button
                       type="button"
-                      className="career-direction__chip career-direction__chip--you"
+                      className="career-direction__parse-link"
                       onClick={() => jumpToReflection(insights.reflectionGap.reflectionId)}
                     >
                       {insights.reflectionGap.label}
                     </button>
-                  )}
-                </div>
-              ) : (
-                <span className="career-direction__parse-empty">Gaps cleared.</span>
-              )}
-            </div>
-          </div>
+                  </>
+                )}
+              </span>
+            )}
+          </p>
         )}
 
         <div className="career-direction__snapshot-grid">
           {SNAPSHOT_FIELDS.map((field) => {
             const status = hasParsed ? fieldStatus(field.key) : (fieldFilled(snapshot[field.key]) ? 'yours' : 'add');
+            const needsYou = status === 'add' || status === 'review';
             const hint = insights?.fieldHints?.[field.key];
             const focused = focusField === field.key;
             return (
               <label
                 key={field.key}
                 data-field={field.key}
-                className={`career-direction__field career-direction__field--${status}${focused ? ' career-direction__field--focused' : ''}`}
+                className={`career-direction__field${needsYou ? ` career-direction__field--${status}` : ''}${focused ? ' career-direction__field--focused' : ''}`}
               >
                 <span className="career-direction__field-label">
                   {field.label}
-                  <em className={`career-direction__field-badge career-direction__field-badge--${status}`}>
-                    {FIELD_STATUS_LABEL[status]}
-                  </em>
+                  {needsYou && (
+                    <em className="career-direction__field-badge">
+                      {status === 'review' ? 'Review' : 'Add'}
+                    </em>
+                  )}
                 </span>
-                {hint && status !== 'from-resume' && (
+                {hint && needsYou && (
                   <span className="career-direction__field-hint">{hint}</span>
                 )}
                 {field.multiline ? (
@@ -927,10 +931,9 @@ export default function CareerDirection({
         </div>
       </div>
 
-      <div ref={reflectionSectionRef} className="career-direction__card career-direction__reflection career-direction__reflection--write">
+      <div ref={reflectionSectionRef} className="career-direction__card career-direction__reflection">
         <div className="career-direction__card-header">
           <div>
-            <span className="career-direction__write-kicker">Your words · not from resume</span>
             <h3>Preferences</h3>
           </div>
           <span className="career-direction__question-count">
