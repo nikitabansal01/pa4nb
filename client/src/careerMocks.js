@@ -249,43 +249,23 @@ export function buildResumeInsights(snapshot = {}, { source = 'upload' } = {}) {
     });
   }
 
-  if (!role) {
-    gaps.push({
-      id: 'missing-role',
-      field: 'currentRole',
-      title: 'Current role',
-      detail: 'We could not confidently read your latest title.',
-      action: 'Confirm your current or most recent role title.',
-    });
-  }
-
-  if (!years) {
-    gaps.push({
-      id: 'missing-years',
-      field: 'yearsExperience',
-      title: 'Years of experience',
-      detail: 'Tenure helps us calibrate seniority of path options.',
-      action: 'Add approximate years of experience.',
-    });
-  }
-
   if (!products || products.length < 36) {
     gaps.push({
       id: 'thin-products',
       field: 'productsBuilt',
-      title: 'Products or systems built',
-      detail: source === 'linkedin'
-        ? 'LinkedIn rarely spells out what you actually shipped.'
-        : 'Product ownership is thin relative to role history.',
-      action: 'Name 1–2 products and the problem each one solved.',
+      title: 'Products shipped',
+      hint: 'Name 1–2 products + the outcome.',
+      detail: '',
+      action: 'Name 1–2 products + the outcome.',
     });
   } else if (!hasOutcomeSignal(products)) {
     gaps.push({
       id: 'product-outcomes',
       field: 'productsBuilt',
-      title: 'Outcomes and impact',
-      detail: 'We see what you built, but not what changed because of it.',
-      action: 'Add a metric, adoption signal, or qualitative outcome for each product.',
+      title: 'Impact',
+      hint: 'Add a metric or clear outcome.',
+      detail: '',
+      action: 'Add a metric or clear outcome.',
     });
   }
 
@@ -293,9 +273,10 @@ export function buildResumeInsights(snapshot = {}, { source = 'upload' } = {}) {
     gaps.push({
       id: 'thin-skills',
       field: 'skills',
-      title: 'Distinctive skills',
-      detail: 'Generic skill labels make path fit harder to judge.',
-      action: 'List the craft skills you want to be known for (not a full keyword dump).',
+      title: 'Skills',
+      hint: 'List the skills you want to be known for.',
+      detail: '',
+      action: 'List the skills you want to be known for.',
     });
   }
 
@@ -303,9 +284,10 @@ export function buildResumeInsights(snapshot = {}, { source = 'upload' } = {}) {
     gaps.push({
       id: 'thin-leadership',
       field: 'leadership',
-      title: 'Leadership depth',
-      detail: 'Influence and mentoring are easy to understate on a profile.',
-      action: 'Note team size, mentoring, or a cross-org decision you owned.',
+      title: 'Leadership',
+      hint: 'Team size, mentoring, or a decision you owned.',
+      detail: '',
+      action: 'Team size, mentoring, or a decision you owned.',
     });
   }
 
@@ -313,47 +295,76 @@ export function buildResumeInsights(snapshot = {}, { source = 'upload' } = {}) {
     gaps.push({
       id: 'missing-industries',
       field: 'industries',
-      title: 'Industry context',
-      detail: 'Domain history helps separate platform, consumer, and specialized paths.',
-      action: 'Add the industries or company types you have worked in.',
+      title: 'Industries',
+      hint: 'Where have you worked?',
+      detail: '',
+      action: 'Where have you worked?',
     });
   }
 
-  // Preference gaps resumes cannot answer — always guide reflection.
+  if (!role) {
+    gaps.push({
+      id: 'missing-role',
+      field: 'currentRole',
+      title: 'Current role',
+      hint: 'Confirm your latest title.',
+      detail: '',
+      action: 'Confirm your latest title.',
+    });
+  }
+
+  if (!years) {
+    gaps.push({
+      id: 'missing-years',
+      field: 'yearsExperience',
+      title: 'Experience',
+      hint: 'Approx years of experience.',
+      detail: '',
+      action: 'Approx years of experience.',
+    });
+  }
+
+  // One reflection nudge only — preferences live in the next section.
   gaps.push({
     id: 'energy-pref',
     field: null,
     reflectionId: 'energy',
-    title: 'What actually gives you energy',
-    detail: 'Resumes list responsibilities, not which ones you want more of.',
-    action: 'In reflection, describe the work that lit you up — and what you want less of.',
+    title: 'What gives you energy',
+    detail: '',
+    action: '',
   });
-
-  gaps.push({
-    id: 'direction-pref',
-    field: null,
-    reflectionId: 'domains',
-    title: 'Where you want to go next',
-    detail: 'Past industries are not the same as future excitement.',
-    action: 'Tell us the domains and stage (0→1 vs scale) you want next.',
-  });
-
   const sourceLabel = source === 'linkedin' ? 'LinkedIn' : 'resume';
-  const gapFocus = gaps
-    .filter((g) => g.field)
-    .slice(0, 2)
-    .map((g) => g.title.toLowerCase());
-
-  const summary = gapFocus.length
-    ? `From your ${sourceLabel}, we have a usable baseline — but paths will be sharper if you add more on ${gapFocus.join(' and ')}. Reflection still covers preferences resumes cannot see.`
-    : `From your ${sourceLabel}, the factual baseline looks solid. Use reflection for energy, preferences, and what you want to learn next.`;
+  const fieldGaps = gaps.filter((g) => g.field).slice(0, 3);
+  const reflectionGap = gaps.find((g) => g.reflectionId) || null;
+  const fieldHints = Object.fromEntries(
+    fieldGaps.map((g) => [g.field, g.hint || g.action || g.detail])
+  );
 
   return {
-    summary,
+    headline: `Pulled from your ${sourceLabel}`,
     source,
-    signals: signals.slice(0, 4),
-    gaps: gaps.slice(0, 5),
-    highlightedFields: [...new Set(gaps.map((g) => g.field).filter(Boolean))],
+    signals: signals.slice(0, 4).map((s) => ({
+      id: s.id,
+      label: s.title,
+    })),
+    fieldGaps: fieldGaps.map((g) => ({
+      id: g.id,
+      field: g.field,
+      label: g.title,
+      hint: g.hint || g.action,
+    })),
+    reflectionGap: reflectionGap
+      ? {
+          id: reflectionGap.id,
+          reflectionId: reflectionGap.reflectionId,
+          label: reflectionGap.title,
+        }
+      : null,
+    fieldHints,
+    highlightedFields: fieldGaps.map((g) => g.field),
+    // legacy shape kept for safety
+    gaps: fieldGaps,
+    summary: '',
   };
 }
 

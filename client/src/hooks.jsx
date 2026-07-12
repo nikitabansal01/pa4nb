@@ -499,15 +499,48 @@ export function useCareerProfile() {
     return commit(applyReflection(getCareerProfile(), { answers, complete }));
   }, [commit]);
 
-  const generatePaths = useCallback((overrides = {}) => {
+  const generatePaths = useCallback(async (overrides = {}) => {
     const current = getCareerProfile();
     const assumptions = overrides.assumptions
       || current.assumptions
       || buildAssumptionsFromAnswers(current.reflection, current.snapshot);
-    const paths = overrides.paths || buildCareerPaths(current.snapshot, assumptions, {
-      answers: current.reflection,
-    });
-    return commit(applyGeneratedPaths(current, { paths, assumptions }));
+    const reflection = overrides.answers || current.reflection || {};
+
+    if (overrides.paths) {
+      return commit(applyGeneratedPaths(current, { paths: overrides.paths, assumptions }));
+    }
+
+    let paths = null;
+    let recommendMode = 'heuristic';
+
+    try {
+      const res = await fetch('/api/career/recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          snapshot: current.snapshot,
+          reflection,
+          assumptions,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.paths) && data.paths.length > 0) {
+          paths = data.paths;
+          recommendMode = data.mode || 'llm';
+        }
+      }
+    } catch (error) {
+      console.warn('Career recommend API unavailable, using local ranking:', error.message);
+    }
+
+    if (!paths) {
+      paths = buildCareerPaths(current.snapshot, assumptions, { answers: reflection });
+      recommendMode = 'heuristic';
+    }
+
+    const saved = commit(applyGeneratedPaths(current, { paths, assumptions }));
+    return { ...saved, recommendMode };
   }, [commit]);
 
   const selectPaths = useCallback(({ primaryPathId, secondaryPathId }) => {

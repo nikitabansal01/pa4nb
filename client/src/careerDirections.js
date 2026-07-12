@@ -990,6 +990,82 @@ function buildWhyFits({ direction, snapshot, assumptions, reasons, trackLabel })
   return `Based on ~${years} yrs as ${role} and interest in ${domains}: ${primary}`;
 }
 
+function uniqueStrings(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    const key = String(item || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function shortPhrase(text, max = 48) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.length <= max) return trimmed;
+  return `${trimmed.slice(0, max - 1).trim()}…`;
+}
+
+/** 3 strengths the user already signals for this route. */
+function buildStrengths(snapshot, direction, evidence = []) {
+  const skills = String(snapshot.skills || '')
+    .split(/[,;·|/]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 3 && s.length <= 42);
+
+  const matchedSkills = skills.filter((skill) => {
+    const lower = skill.toLowerCase();
+    return direction.keywords.some((k) => lower.includes(k) || k.includes(lower.slice(0, 5)));
+  });
+
+  const roleBits = [];
+  if (/product/i.test(snapshot.currentRole || '')) roleBits.push('Product ownership');
+  if (/engineer|developer/i.test(snapshot.currentRole || '')) roleBits.push('Engineering depth');
+  if (/data|scientist|ml/i.test(snapshot.currentRole || '')) roleBits.push('Data / ML fluency');
+  if (String(snapshot.leadership || '').length > 20) roleBits.push('Cross-functional leadership');
+  if (/saas|b2b|enterprise/i.test(normalizeText(snapshot.industries, snapshot.productsBuilt))) {
+    roleBits.push('B2B / SaaS exposure');
+  }
+  if (/marketplace|consumer|mobile/i.test(normalizeText(snapshot.industries, snapshot.productsBuilt))) {
+    roleBits.push('Consumer product exposure');
+  }
+  if (includesAny(normalizeText(snapshot.skills, snapshot.productsBuilt), ['ai', 'llm', 'ml', 'model'])) {
+    roleBits.push('AI-adjacent experience');
+  }
+  if (includesAny(normalizeText(snapshot.skills, snapshot.productsBuilt), ['discover', 'experiment', 'roadmap'])) {
+    roleBits.push('Discovery & roadmapping');
+  }
+
+  const fromFocus = direction.focusAreas.filter((area) => {
+    const blob = normalizeText(snapshot.skills, snapshot.productsBuilt, snapshot.leadership, snapshot.industries);
+    return area.toLowerCase().split(/\s+/).some((token) => token.length > 3 && blob.includes(token));
+  });
+
+  // Prefer short skill chips; skip long evidence paragraphs.
+  void evidence;
+
+  return uniqueStrings([
+    ...matchedSkills,
+    ...roleBits,
+    ...fromFocus,
+    ...skills.slice(0, 2),
+  ]).slice(0, 3);
+}
+
+/** 2 areas to build — prefer focus areas not already counted as strengths. */
+function buildNextAreas(direction, strengths = []) {
+  const strengthBlob = strengths.join(' ').toLowerCase();
+  const remaining = direction.focusAreas.filter((area) => {
+    const tokens = area.toLowerCase().split(/\s+/).slice(0, 2);
+    return !tokens.every((t) => t.length > 2 && strengthBlob.includes(t));
+  });
+  const pool = remaining.length ? remaining : direction.focusAreas;
+  return pool.slice(0, 2);
+}
+
+const RANK_LABELS = ['Best match', 'Worth exploring', 'Stretch option'];
+
 /**
  * Rank catalog directions for a resume + reflection profile.
  * Returns top N personalized path cards.
@@ -1033,22 +1109,33 @@ export function recommendCareerPaths(snapshot = {}, assumptions = {}, { answers 
     picked.push(next);
   }
 
-  return picked.map(({ direction, score, reasons }) => ({
-    id: direction.id,
-    title: direction.title,
-    track,
-    trackLabel,
-    category: direction.category,
-    matchScore: score,
-    whyFits: buildWhyFits({ direction, snapshot, assumptions, reasons, trackLabel }),
-    evidence: buildEvidence(snapshot, direction),
-    exciting: direction.exciting,
-    tradeoffs: direction.tradeoffs,
-    deepen: direction.focusAreas.slice(0, 4),
-    roles: direction.roles,
-    dimensions: direction.dimensions,
-    focusAreas: direction.focusAreas.slice(0, 3),
-  }));
+  return picked.map(({ direction, score, reasons }, index) => {
+    const evidence = buildEvidence(snapshot, direction);
+    const strengths = buildStrengths(snapshot, direction, evidence);
+    const buildNext = buildNextAreas(direction, strengths);
+    return {
+      id: direction.id,
+      title: direction.title,
+      track,
+      trackLabel,
+      category: direction.category,
+      rank: index + 1,
+      rankLabel: RANK_LABELS[index] || `Option ${index + 1}`,
+      matchScore: score,
+      summary: direction.exciting,
+      whyFits: buildWhyFits({ direction, snapshot, assumptions, reasons, trackLabel }),
+      strengths,
+      buildNext,
+      evidence,
+      exciting: direction.exciting,
+      tradeoffs: direction.tradeoffs,
+      deepen: direction.focusAreas.slice(0, 4),
+      roles: direction.roles,
+      dimensions: direction.dimensions,
+      focusAreas: direction.focusAreas.slice(0, 4),
+      whatItDoes: direction.focusAreas.slice(0, 4),
+    };
+  });
 }
 
 export function getDirectionById(id) {

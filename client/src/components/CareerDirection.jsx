@@ -14,7 +14,7 @@ import {
   MessageCircle,
   SlidersHorizontal,
   RefreshCw,
-  Lightbulb,
+  X,
   ArrowRight,
 } from 'lucide-react';
 import {
@@ -23,7 +23,6 @@ import {
   MOCK_LINKEDIN_SNAPSHOT,
   REFLECTION_QUESTIONS,
   SNAPSHOT_FIELDS,
-  COMPARISON_DIMENSIONS,
   ASSUMPTION_FIELDS,
   buildAssumptionsFromAnswers,
   buildCareerPaths,
@@ -37,85 +36,144 @@ function fieldFilled(value) {
   return Boolean(String(value || '').trim());
 }
 
-function PathCard({
+function RouteCard({ path, isPrimary, onExplore }) {
+  const strengths = (path.strengths || path.evidence || []).slice(0, 3);
+  const buildNext = (path.buildNext || path.deepen || []).slice(0, 2);
+
+  return (
+    <article
+      className={`route-card${isPrimary ? ' route-card--selected' : ''}${path.rank === 1 ? ' route-card--best' : ''}`}
+    >
+      <div className="route-card__header">
+        <span className={`route-card__rank route-card__rank--${path.rank || 1}`}>
+          {path.rankLabel || 'Route'}
+        </span>
+        {isPrimary && <span className="route-card__selected-tag">Selected</span>}
+      </div>
+
+      <h3 className="route-card__title">{path.title}</h3>
+      <p className="route-card__summary">{path.summary || path.exciting || path.whyFits}</p>
+
+      <div className="route-card__lists">
+        <div>
+          <h4>You already have</h4>
+          <ul>
+            {strengths.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+        <div>
+          <h4>Build next</h4>
+          <ul>
+            {buildNext.map((item) => (
+              <li key={item}>{item}</li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <button type="button" className="submit-btn route-card__cta" onClick={onExplore}>
+        Explore route
+        <ArrowRight size={16} />
+      </button>
+    </article>
+  );
+}
+
+function RouteExplorePanel({
   path,
   isPrimary,
   isSecondary,
+  onClose,
   onSelectPrimary,
   onSaveSecondary,
 }) {
-  return (
-    <article
-      className={`path-card${isPrimary ? ' path-card--primary' : ''}${isSecondary ? ' path-card--secondary' : ''}`}
-    >
-      <div className="path-card__top">
-        <div>
-          <div className="path-card__meta">
-            {path.trackLabel && <span className="path-card__track">{path.trackLabel}</span>}
-            {path.category && (
-              <span className={`path-card__category path-card__category--${path.category}`}>
-                {path.category === 'emerging' ? 'AI & emerging' : path.category}
-              </span>
-            )}
-          </div>
-          <h3>{path.title}</h3>
-          <p className="path-card__lead">{path.whyFits}</p>
-        </div>
-        <div className="path-card__badges">
-          {isPrimary && <span className="path-card__badge path-card__badge--primary">Primary</span>}
-          {isSecondary && <span className="path-card__badge path-card__badge--secondary">Secondary</span>}
-        </div>
-      </div>
+  if (!path) return null;
 
-      <dl className="path-card__facts">
-        <div>
-          <dt>Evidence</dt>
-          <dd>
+  const skillsToBuild = (path.buildNext || path.deepen || []).slice(0, 4);
+  const whatItDoes = (path.whatItDoes || path.focusAreas || []).slice(0, 4);
+
+  return (
+    <div className="route-explore-backdrop" role="presentation" onClick={onClose}>
+      <aside
+        className="route-explore-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="route-explore-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="route-explore-panel__header">
+          <div>
+            <span className={`route-card__rank route-card__rank--${path.rank || 1}`}>
+              {path.rankLabel}
+            </span>
+            <h2 id="route-explore-title">{path.title}</h2>
+          </div>
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
+            <X size={18} />
+          </button>
+        </header>
+
+        <div className="route-explore-panel__body">
+          <section>
+            <h3>What this role does</h3>
+            <p>{path.summary || path.exciting}</p>
+            {whatItDoes.length > 0 && (
+              <ul>
+                {whatItDoes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section>
+            <h3>Why it may fit</h3>
+            <p>{path.whyFits}</p>
+          </section>
+
+          <section>
+            <h3>Main trade-offs</h3>
+            <p>{path.tradeoffs}</p>
+          </section>
+
+          <section>
+            <h3>Skills to build</h3>
             <ul>
-              {path.evidence.slice(0, 3).map((item) => (
+              {skillsToBuild.map((item) => (
                 <li key={item}>{item}</li>
               ))}
             </ul>
-          </dd>
-        </div>
-        <div>
-          <dt>Exciting</dt>
-          <dd>{path.exciting}</dd>
-        </div>
-        <div>
-          <dt>Trade-offs</dt>
-          <dd>{path.tradeoffs}</dd>
-        </div>
-        <div>
-          <dt>Deepen next</dt>
-          <dd>{path.deepen.join(' · ')}</dd>
-        </div>
-        <div className="path-card__facts-span">
-          <dt>Example roles</dt>
-          <dd>{path.roles.join(' · ')}</dd>
-        </div>
-      </dl>
+          </section>
 
-      <div className="path-card__actions">
-        <button
-          type="button"
-          className={`auth-btn${isPrimary ? ' auth-btn--primary' : ''}`}
-          onClick={onSelectPrimary}
-        >
-          <Star size={14} />
-          {isPrimary ? 'Primary path' : 'Select primary'}
-        </button>
-        <button
-          type="button"
-          className={`auth-btn${isSecondary ? ' auth-btn--primary' : ''}`}
-          onClick={onSaveSecondary}
-          disabled={isPrimary}
-        >
-          <Bookmark size={14} />
-          {isSecondary ? 'Secondary saved' : 'Save secondary'}
-        </button>
-      </div>
-    </article>
+          <section>
+            <h3>Example job titles</h3>
+            <p className="route-explore-panel__titles">{(path.roles || []).join(' · ')}</p>
+          </section>
+        </div>
+
+        <footer className="route-explore-panel__footer">
+          <button
+            type="button"
+            className={`auth-btn${isPrimary ? ' auth-btn--primary' : ''}`}
+            onClick={onSelectPrimary}
+          >
+            <Star size={14} />
+            {isPrimary ? 'Primary route' : 'Make primary'}
+          </button>
+          <button
+            type="button"
+            className={`auth-btn${isSecondary ? ' auth-btn--primary' : ''}`}
+            onClick={onSaveSecondary}
+            disabled={isPrimary}
+          >
+            <Bookmark size={14} />
+            {isSecondary ? 'Saved secondary' : 'Save secondary'}
+          </button>
+        </footer>
+      </aside>
+    </div>
   );
 }
 
@@ -132,6 +190,7 @@ export default function CareerDirection({
   const viewBootstrapped = useRef(false);
 
   const [linkedinUrl, setLinkedinUrl] = useState('');
+  const [resumeText, setResumeText] = useState('');
   const [importStatus, setImportStatus] = useState('idle');
   const [importMessage, setImportMessage] = useState('');
   const [fileName, setFileName] = useState('');
@@ -150,7 +209,7 @@ export default function CareerDirection({
   const [generating, setGenerating] = useState(false);
   const [resumeSource, setResumeSource] = useState(null);
   const [focusField, setFocusField] = useState(null);
-  const insightsRef = useRef(null);
+  const [exploredRouteId, setExploredRouteId] = useState(null);
   const snapshotSectionRef = useRef(null);
   const reflectionSectionRef = useRef(null);
 
@@ -202,15 +261,48 @@ export default function CareerDirection({
     return buildResumeInsights(snapshot, { source: resumeSource || 'upload' });
   }, [hasParsed, resumeSource, snapshot]);
 
-  const simulateParse = async ({ source, sourceLabel, nextFileName, nextLinkedinUrl }) => {
+  const parseResumeImport = async ({
+    source,
+    sourceLabel,
+    nextFileName,
+    nextLinkedinUrl,
+    text = '',
+  }) => {
     setImportStatus('loading');
-    setImportMessage(`Reading your ${sourceLabel}…`);
+    setImportMessage(`Reading your ${sourceLabel} with AI…`);
     setGenerateNote(null);
     setFocusField(null);
 
-    await new Promise((resolve) => setTimeout(resolve, 1100));
+    let parsedSnapshot = source === 'linkedin' ? MOCK_LINKEDIN_SNAPSHOT : MOCK_RESUME_SNAPSHOT;
+    let parseMode = 'heuristic';
+    let warning = null;
 
-    const parsedSnapshot = source === 'linkedin' ? MOCK_LINKEDIN_SNAPSHOT : MOCK_RESUME_SNAPSHOT;
+    try {
+      const res = await fetch('/api/career/parse-resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source,
+          fileName: nextFileName || '',
+          linkedinUrl: nextLinkedinUrl || '',
+          text: text || '',
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.snapshot && typeof data.snapshot === 'object') {
+          parsedSnapshot = { ...EMPTY_SNAPSHOT, ...data.snapshot };
+          parseMode = data.mode || 'llm';
+          warning = data.warning || null;
+        }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Resume parse failed');
+      }
+    } catch (error) {
+      warning = error.message || 'AI parse unavailable — using a demo snapshot.';
+      parseMode = 'heuristic';
+    }
 
     const next = importResume({
       source,
@@ -225,12 +317,18 @@ export default function CareerDirection({
     setFileName(next?.resume?.fileName || nextFileName || '');
     setLinkedinUrl(next?.resume?.linkedinUrl || nextLinkedinUrl || '');
     setImportStatus('success');
-    setImportMessage(
-      'Context loaded. Review the insights below — they show what we understood and what still needs your input.'
-    );
+
+    if (parseMode === 'llm') {
+      setImportMessage(warning || 'Background extracted with AI — skim We got / Your turn, then fix anything thin.');
+    } else {
+      setImportMessage(
+        warning
+          || 'Demo snapshot loaded. Paste resume text or set OPENAI_API_KEY for grounded AI parsing.'
+      );
+    }
 
     requestAnimationFrame(() => {
-      insightsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      snapshotSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   };
 
@@ -267,16 +365,56 @@ export default function CareerDirection({
     }
 
     setFileName(file.name);
+
+    let text = resumeText.trim();
+    if (ext === 'txt') {
+      try {
+        text = (await file.text()).trim() || text;
+        setResumeText(text);
+      } catch {
+        // keep pasted text if any
+      }
+    } else if (!text) {
+      // Binary formats: prefer pasted text for grounded LLM parse
+      setImportStatus('error');
+      setImportMessage(
+        'PDF/DOCX text extraction is limited here. Paste your resume text below, then click Import from text — or upload a .txt export.'
+      );
+      return;
+    }
+
     try {
-      await simulateParse({
+      await parseResumeImport({
         source: 'upload',
         sourceLabel: 'resume',
         nextFileName: file.name,
         nextLinkedinUrl: linkedinUrl,
+        text,
       });
     } catch {
       setImportStatus('error');
-      setImportMessage('Could not parse that resume. Try another file or paste a LinkedIn URL.');
+      setImportMessage('Could not parse that resume. Try pasting text or a LinkedIn URL.');
+    }
+  };
+
+  const handleTextImport = async () => {
+    const text = resumeText.trim();
+    if (!text) {
+      setImportStatus('error');
+      setImportMessage('Paste resume text first, or upload a .txt file.');
+      return;
+    }
+    try {
+      await parseResumeImport({
+        source: 'upload',
+        sourceLabel: 'resume text',
+        nextFileName: fileName || 'pasted-resume.txt',
+        nextLinkedinUrl: linkedinUrl,
+        text,
+      });
+    } catch {
+      setImportStatus('error');
+      setImportMessage('Could not parse that text. Try again.');
     }
   };
 
@@ -295,15 +433,16 @@ export default function CareerDirection({
 
     setFileName('');
     try {
-      await simulateParse({
+      await parseResumeImport({
         source: 'linkedin',
         sourceLabel: 'LinkedIn profile',
         nextFileName: '',
         nextLinkedinUrl: url,
+        text: resumeText.trim(),
       });
     } catch {
       setImportStatus('error');
-      setImportMessage('Could not import from LinkedIn. Try uploading a resume instead.');
+      setImportMessage('Could not import from LinkedIn. Try pasting resume text instead.');
     }
   };
 
@@ -354,9 +493,17 @@ export default function CareerDirection({
     setGenerateNote(null);
   };
 
-  const showResults = (nextAssumptions) => {
-    const next = generatePaths({ assumptions: nextAssumptions });
-    applyGeneratedProfile(next);
+  const showResults = async (nextAssumptions) => {
+    setGenerating(true);
+    try {
+      const next = await generatePaths({ assumptions: nextAssumptions });
+      applyGeneratedProfile(next);
+      if (next?.recommendMode === 'heuristic') {
+        setGenerateNote('Ranked with rules — set OPENAI_API_KEY on the server for LLM-grounded routes.');
+      }
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -372,13 +519,25 @@ export default function CareerDirection({
 
     setGenerating(true);
     setGenerateNote(null);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    setReflectionComplete(true);
-    updateReflection(answers, { complete: true });
-    const nextAssumptions = buildAssumptionsFromAnswers(answers, snapshot);
-    const next = generatePaths({ assumptions: nextAssumptions });
-    applyGeneratedProfile(next);
-    setGenerating(false);
+    try {
+      setReflectionComplete(true);
+      updateReflection(answers, { complete: true });
+      const nextAssumptions = buildAssumptionsFromAnswers(answers, snapshot);
+      const next = await generatePaths({
+        assumptions: nextAssumptions,
+        answers,
+      });
+      applyGeneratedProfile(next);
+      if (next?.recommendMode === 'llm') {
+        setGenerateNote(null);
+      } else if (next?.recommendMode === 'heuristic') {
+        setGenerateNote('Ranked with rules — set OPENAI_API_KEY on the server for LLM-grounded routes.');
+      }
+    } catch (error) {
+      setGenerateNote(error.message || 'Could not generate routes. Try again.');
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleReopenReflection = () => {
@@ -387,10 +546,10 @@ export default function CareerDirection({
     setGenerateNote('Update any answers, then generate paths again.');
   };
 
-  const handleSaveAssumptions = () => {
+  const handleSaveAssumptions = async () => {
     if (!assumptions) return;
     updateAssumptions(assumptions);
-    showResults(assumptions);
+    await showResults(assumptions);
     setEditingAssumptions(false);
   };
 
@@ -411,15 +570,14 @@ export default function CareerDirection({
   };
 
   if (view === 'results') {
+    const rankedRoutes = paths.slice(0, 3);
+    const exploredRoute = rankedRoutes.find((p) => p.id === exploredRouteId) || null;
+
     return (
       <section className="career-direction career-direction--results">
-        <header className="ui-section ui-section--header career-direction__intro">
-          <h2>Top routes for you</h2>
-          <p>
-            Ranked from your resume strengths and reflection answers
-            {paths[0]?.trackLabel ? ` within ${paths[0].trackLabel}` : ''}
-            — compare, then pick a primary.
-          </p>
+        <header className="ui-section ui-section--header career-direction__intro career-direction__intro--results">
+          <h2>Your strongest routes</h2>
+          <p>Based on your background and what you want next.</p>
         </header>
 
         <div className="career-direction__results-toolbar">
@@ -438,10 +596,13 @@ export default function CareerDirection({
           <button
             type="button"
             className="auth-btn"
-            onClick={() => showResults(assumptions || buildAssumptionsFromAnswers(answers, snapshot))}
+            onClick={() => {
+              setExploredRouteId(null);
+              showResults(assumptions || buildAssumptionsFromAnswers(answers, snapshot));
+            }}
           >
             <RefreshCw size={14} />
-            Refresh paths
+            Refresh routes
           </button>
         </div>
 
@@ -451,7 +612,7 @@ export default function CareerDirection({
               <SlidersHorizontal size={18} />
               <div>
                 <h3>Edit assumptions</h3>
-                <p>Tweak the inputs behind these paths, then refresh the comparison.</p>
+                <p>Tweak these, then refresh routes.</p>
               </div>
             </div>
             <div className="career-direction__assumptions-grid">
@@ -471,73 +632,42 @@ export default function CareerDirection({
             </div>
             <div className="career-direction__assumptions-actions">
               <button type="button" className="submit-btn" onClick={handleSaveAssumptions}>
-                Apply & refresh paths
+                Apply & refresh routes
               </button>
             </div>
           </div>
         )}
 
-        {(primaryPathId || secondaryPathId) && (
-          <div className="career-direction__selection-summary" aria-live="polite">
-            {primaryPathId && (
-              <span>
-                Primary: <strong>{paths.find((p) => p.id === primaryPathId)?.title}</strong>
-              </span>
-            )}
-            {secondaryPathId && (
-              <span>
-                Secondary: <strong>{paths.find((p) => p.id === secondaryPathId)?.title}</strong>
-              </span>
-            )}
-          </div>
+        {primaryPathId && (
+          <p className="career-direction__selection-summary" aria-live="polite">
+            Primary route: <strong>{paths.find((p) => p.id === primaryPathId)?.title}</strong>
+            {secondaryPathId
+              ? <> · Secondary: <strong>{paths.find((p) => p.id === secondaryPathId)?.title}</strong></>
+              : null}
+          </p>
         )}
 
-        <div className="path-card-grid">
-          {paths.map((path) => (
-            <PathCard
+        <div className="route-card-list">
+          {rankedRoutes.map((path) => (
+            <RouteCard
               key={path.id}
               path={path}
               isPrimary={primaryPathId === path.id}
-              isSecondary={secondaryPathId === path.id}
-              onSelectPrimary={() => selectPrimary(path.id)}
-              onSaveSecondary={() => saveSecondary(path.id)}
+              onExplore={() => setExploredRouteId(path.id)}
             />
           ))}
         </div>
 
-        <div className="career-direction__card career-direction__compare">
-          <div className="career-direction__card-header">
-            <div>
-              <h3>Compare across dimensions</h3>
-              <p>Scan how the paths differ — then choose a primary and optional secondary.</p>
-            </div>
-          </div>
-
-          <div className="compare-table-wrap">
-            <table className="compare-table">
-              <thead>
-                <tr>
-                  <th scope="col">Dimension</th>
-                  {paths.map((path) => (
-                    <th key={path.id} scope="col">
-                      {path.title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_DIMENSIONS.map((dim) => (
-                  <tr key={dim.key}>
-                    <th scope="row">{dim.label}</th>
-                    {paths.map((path) => (
-                      <td key={`${path.id}-${dim.key}`}>{path.dimensions[dim.key]}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        {exploredRoute && (
+          <RouteExplorePanel
+            path={exploredRoute}
+            isPrimary={primaryPathId === exploredRoute.id}
+            isSecondary={secondaryPathId === exploredRoute.id}
+            onClose={() => setExploredRouteId(null)}
+            onSelectPrimary={() => selectPrimary(exploredRoute.id)}
+            onSaveSecondary={() => saveSecondary(exploredRoute.id)}
+          />
+        )}
       </section>
     );
   }
@@ -575,7 +705,7 @@ export default function CareerDirection({
           <FileText size={18} />
           <div>
             <h3>Resume import</h3>
-            <p>Upload a resume or add LinkedIn so we can understand your background.</p>
+            <p>Paste resume text (best), upload .txt, or add LinkedIn — AI extracts your background.</p>
           </div>
         </div>
 
@@ -594,7 +724,7 @@ export default function CareerDirection({
             disabled={importStatus === 'loading'}
           >
             {importStatus === 'loading' ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
-            Upload resume
+            Upload .txt
           </button>
           <div className="career-direction__linkedin">
             <label htmlFor="linkedin-url">LinkedIn URL (optional)</label>
@@ -622,10 +752,33 @@ export default function CareerDirection({
           </div>
         </div>
 
-        <p className="career-direction__file-note">
-          Supported files: {ACCEPTED_LABEL}
-          {fileName ? ` · Selected: ${fileName}` : ''}
-        </p>
+        <label className="career-direction__paste" htmlFor="resume-text">
+          <span>Paste resume text</span>
+          <textarea
+            id="resume-text"
+            className="compass-field__input"
+            rows={4}
+            value={resumeText}
+            onChange={(e) => setResumeText(e.target.value)}
+            placeholder="Paste the plain text of your resume here for grounded AI parsing…"
+            disabled={importStatus === 'loading'}
+          />
+        </label>
+        <div className="career-direction__paste-actions">
+          <button
+            type="button"
+            className="auth-btn auth-btn--primary"
+            onClick={handleTextImport}
+            disabled={importStatus === 'loading'}
+          >
+            {importStatus === 'loading' ? <Loader2 size={14} className="spin" /> : <Sparkles size={14} />}
+            Import from text
+          </button>
+          <p className="career-direction__file-note">
+            .txt upload works directly. For PDF/DOCX, paste the text here.
+            {fileName ? ` · Selected: ${fileName}` : ''}
+          </p>
+        </div>
 
         {importStatus === 'loading' && (
           <div className="career-direction__status career-direction__status--loading" role="status">
@@ -647,83 +800,69 @@ export default function CareerDirection({
         )}
       </div>
 
-      {insights && (
-        <div
-          ref={insightsRef}
-          className="career-direction__card career-direction__insights"
-          aria-live="polite"
-        >
-          <div className="career-direction__card-header">
-            <Lightbulb size={18} />
-            <div>
-              <h3>Import insights</h3>
-              <p>What we already understand — and where more context will improve your path options.</p>
-            </div>
-          </div>
-
-          <p className="career-direction__insights-summary">{insights.summary}</p>
-
-          <div className="career-direction__insights-grid">
-            <section>
-              <h4>Signals we picked up</h4>
-              {insights.signals.length === 0 ? (
-                <p className="career-direction__insights-empty">
-                  Not much structured signal yet — fill the snapshot below so we have a baseline.
-                </p>
-              ) : (
-                <ul className="career-direction__insight-list">
-                  {insights.signals.map((item) => (
-                    <li key={item.id}>
-                      <strong>{item.title}</strong>
-                      <span>{item.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            <section>
-              <h4>Add more context on</h4>
-              <ul className="career-direction__insight-list career-direction__insight-list--gaps">
-                {insights.gaps.map((item) => (
-                  <li key={item.id}>
-                    <strong>{item.title}</strong>
-                    <span>{item.detail}</span>
-                    <button
-                      type="button"
-                      className="auth-btn career-direction__insight-action"
-                      onClick={() => {
-                        if (item.field) jumpToSnapshotField(item.field);
-                        else if (item.reflectionId) jumpToReflection(item.reflectionId);
-                      }}
-                    >
-                      {item.action}
-                      <ArrowRight size={14} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </div>
-        </div>
-      )}
-
       <div ref={snapshotSectionRef} className="career-direction__card">
         <div className="career-direction__card-header">
           <Sparkles size={18} />
           <div>
-            <h3>Parsed career snapshot</h3>
+            <h3>Your background</h3>
             <p>
               {hasParsed
-                ? 'Edit anything that is incomplete or wrong — this stays your source of truth.'
-                : 'Upload a resume to prefill, or fill these in yourself. Resume is context, not a score.'}
+                ? 'One place to edit. Cyan = we inferred it. Amber = still needs you.'
+                : 'Upload a resume to prefill, or fill this in yourself.'}
             </p>
           </div>
         </div>
 
+        {insights && (
+          <div className="career-direction__parse-brief" aria-live="polite">
+            <div className="career-direction__parse-row career-direction__parse-row--ai">
+              <span className="career-direction__parse-kicker">We got</span>
+              {insights.signals.length === 0 ? (
+                <span className="career-direction__parse-empty">Not much yet — fill the fields below.</span>
+              ) : (
+                <div className="career-direction__parse-chips">
+                  {insights.signals.map((item) => (
+                    <span key={item.id} className="career-direction__chip career-direction__chip--ai">
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {(insights.fieldGaps?.length > 0 || insights.reflectionGap) && (
+              <div className="career-direction__parse-row career-direction__parse-row--you">
+                <span className="career-direction__parse-kicker">Your turn</span>
+                <div className="career-direction__parse-chips">
+                  {insights.fieldGaps?.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="career-direction__chip career-direction__chip--you"
+                      onClick={() => jumpToSnapshotField(item.field)}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                  {insights.reflectionGap && (
+                    <button
+                      type="button"
+                      className="career-direction__chip career-direction__chip--you"
+                      onClick={() => jumpToReflection(insights.reflectionGap.reflectionId)}
+                    >
+                      {insights.reflectionGap.label}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="career-direction__snapshot-grid">
           {SNAPSHOT_FIELDS.map((field) => {
             const needsContext = insights?.highlightedFields?.includes(field.key);
+            const hint = insights?.fieldHints?.[field.key];
             const focused = focusField === field.key;
             return (
               <label
@@ -731,14 +870,15 @@ export default function CareerDirection({
                 data-field={field.key}
                 className={`career-direction__field${needsContext ? ' career-direction__field--needs-context' : ''}${focused ? ' career-direction__field--focused' : ''}`}
               >
-                <span>
+                <span className="career-direction__field-label">
                   {field.label}
-                  {needsContext ? ' · needs more context' : ''}
+                  {needsContext && <em>needs you</em>}
                 </span>
+                {hint && <span className="career-direction__field-hint">{hint}</span>}
                 {field.multiline ? (
                   <textarea
                     className="compass-field__input"
-                    rows={3}
+                    rows={2}
                     value={snapshot[field.key]}
                     onChange={(e) => handleSnapshotChange(field.key, e.target.value)}
                     onFocus={() => setFocusField(field.key)}
@@ -763,8 +903,8 @@ export default function CareerDirection({
       <div ref={reflectionSectionRef} className="career-direction__card career-direction__reflection">
         <div className="career-direction__card-header">
           <div>
-            <h3>Conversational reflection</h3>
-            <p>One question at a time — help us understand the work that fits you.</p>
+            <h3>Quick preferences</h3>
+            <p>Resumes miss this. Answer a few preferences, then generate paths.</p>
           </div>
           <span className="career-direction__question-count">
             {questionIndex + 1} / {REFLECTION_QUESTIONS.length}
@@ -819,7 +959,7 @@ export default function CareerDirection({
           disabled={generating}
         >
           {generating ? <Loader2 size={18} className="spin" /> : <Sparkles size={18} />}
-          Generate my career paths
+          {generating ? 'Generating routes…' : 'Generate my career paths'}
         </button>
         {generateNote && (
           <p className="career-direction__cta-note" role="status">

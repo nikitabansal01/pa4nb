@@ -47,6 +47,8 @@ import {
   buildCalendarReviewProposals,
   applySelectedProposals,
 } from './calendarSync.js';
+import { recommendCareerRoutes } from './careerIntelligence.js';
+import { parseCareerResume } from './resumeParse.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -72,6 +74,8 @@ app.get('/', (_req, res) => {
       applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
       labels: 'GET/POST/PUT/DELETE /api/labels (auth required)',
       voiceDump: 'POST /api/voice-dump',
+      careerRecommend: 'POST /api/career/recommend',
+      careerParseResume: 'POST /api/career/parse-resume',
       google: 'GET /api/google/status | /api/google/connect | POST /api/google/preview | POST /api/google/apply | DELETE /api/google/disconnect',
       meta: '/api/meta',
     },
@@ -277,6 +281,54 @@ app.post('/api/voice-dump', optionalAuth, async (req, res) => {
   } catch (error) {
     console.error('Voice dump failed:', error);
     res.status(500).json({ error: error.message || 'Failed to process voice dump' });
+  }
+});
+
+app.post('/api/career/recommend', optionalAuth, async (req, res) => {
+  try {
+    const { snapshot, reflection, assumptions } = req.body || {};
+    if (!snapshot || typeof snapshot !== 'object') {
+      return res.status(400).json({ error: 'Resume snapshot is required' });
+    }
+
+    const result = await recommendCareerRoutes({
+      snapshot,
+      reflection: reflection || {},
+      assumptions: assumptions || {},
+    });
+
+    res.json({
+      paths: result.paths,
+      mode: result.mode,
+      track: result.track,
+      trackLabel: result.trackLabel,
+      aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+    });
+  } catch (error) {
+    console.error('Career recommend failed:', error);
+    res.status(500).json({ error: error.message || 'Failed to recommend career routes' });
+  }
+});
+
+app.post('/api/career/parse-resume', optionalAuth, async (req, res) => {
+  try {
+    const { source, text, linkedinUrl, fileName } = req.body || {};
+    const result = await parseCareerResume({
+      source: source === 'linkedin' ? 'linkedin' : 'upload',
+      text: text || '',
+      linkedinUrl: linkedinUrl || '',
+      fileName: fileName || '',
+    });
+
+    res.json({
+      snapshot: result.snapshot,
+      mode: result.mode,
+      warning: result.warning,
+      aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+    });
+  } catch (error) {
+    console.error('Resume parse failed:', error);
+    res.status(500).json({ error: error.message || 'Failed to parse resume' });
   }
 });
 
