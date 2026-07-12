@@ -5,22 +5,18 @@ import {
   Library,
   MessageSquare,
   ArrowRight,
-  Sparkles,
 } from 'lucide-react';
 import { STATUS_COLORS } from '../constants';
 import {
   getPracticedQuestions,
-  getStoryBank,
   savePracticedQuestions,
-  saveStoryBank,
+  setLearningTab,
 } from '../storage';
 import { getCareerDirectionSnapshot } from '../utils/todayInsights';
 import {
-  buildPersonalizedStoryBank,
   getIncompletePrepTasks,
   getRecentlyPracticedQuestions,
   getUpcomingInterviewCards,
-  STORY_GROUPS,
 } from '../utils/interviewPrepHub';
 import { getWorkspace } from '../utils/companyWorkspace';
 import EmptyState from './EmptyState';
@@ -35,7 +31,6 @@ export default function InterviewPrep({
 }) {
   const direction = directionProp || getCareerDirectionSnapshot(profile);
   const [practiced, setPracticed] = useState(() => getPracticedQuestions());
-  const [savedBank, setSavedBank] = useState(() => getStoryBank());
 
   const interviews = useMemo(
     () => getUpcomingInterviewCards(applications, profile),
@@ -48,10 +43,6 @@ export default function InterviewPrep({
   const recentQuestions = useMemo(
     () => getRecentlyPracticedQuestions(applications, practiced),
     [applications, practiced]
-  );
-  const storyBank = useMemo(
-    () => buildPersonalizedStoryBank(applications, profile || direction, savedBank),
-    [applications, profile, direction, savedBank]
   );
 
   const pathLabel = direction?.primaryTitle || 'your target path';
@@ -84,16 +75,9 @@ export default function InterviewPrep({
     }
   };
 
-  const updateStory = (groupId, field, value) => {
-    const next = {
-      ...(savedBank || {}),
-      [groupId]: {
-        ...(savedBank?.[groupId] || {}),
-        [field]: value,
-      },
-    };
-    setSavedBank(next);
-    saveStoryBank(next);
+  const openStoryBank = () => {
+    setLearningTab('stories');
+    onNavigate?.('learning');
   };
 
   return (
@@ -253,65 +237,18 @@ export default function InterviewPrep({
         </aside>
       </div>
 
-      <section className="os-card interview-hub__card interview-hub__story-bank">
+      <section className="os-card interview-hub__card interview-hub__story-bank interview-hub__story-bank--link">
         <div className="os-card__header interview-hub__section-head">
           <Library size={18} />
           <div>
-            <h3>Reusable story bank</h3>
-            <p>
-              Personalized to {pathLabel}
-              {direction?.focusAreas?.length
-                ? ` · focus: ${direction.focusAreas.slice(0, 2).join(', ')}`
-                : ''}
-              . Edit angles with your real evidence — not generic library blurbs.
-            </p>
+            <h3>Behavioral Story Bank</h3>
+            <p>Reusable STAR stories live in Learning.</p>
           </div>
         </div>
-
-        <div className="story-bank-grid">
-          {storyBank.map((story) => (
-            <article key={story.id} className="story-bank-card">
-              <div className="story-bank-card__top">
-                <h4>{story.label}</h4>
-                <span>
-                  <Sparkles size={12} />
-                  For {story.path}
-                </span>
-              </div>
-              <label className="career-direction__field">
-                <span>Story</span>
-                <textarea
-                  className="compass-field__input"
-                  rows={2}
-                  value={story.prompt}
-                  onChange={(e) => updateStory(story.id, 'prompt', e.target.value)}
-                />
-              </label>
-              <label className="career-direction__field">
-                <span>Angle for this path</span>
-                <textarea
-                  className="compass-field__input"
-                  rows={2}
-                  value={story.angle}
-                  onChange={(e) => updateStory(story.id, 'angle', e.target.value)}
-                />
-              </label>
-              <label className="career-direction__field">
-                <span>Resume evidence</span>
-                <textarea
-                  className="compass-field__input"
-                  rows={2}
-                  value={story.evidence}
-                  onChange={(e) => updateStory(story.id, 'evidence', e.target.value)}
-                />
-              </label>
-            </article>
-          ))}
-        </div>
-
-        <p className="interview-hub__story-note">
-          Groups covered: {STORY_GROUPS.map((g) => g.label).join(' · ')}
-        </p>
+        <button type="button" className="auth-btn auth-btn--primary" onClick={openStoryBank}>
+          Open story bank
+          <ArrowRight size={14} />
+        </button>
       </section>
     </section>
   );

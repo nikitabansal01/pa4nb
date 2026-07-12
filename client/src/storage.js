@@ -12,6 +12,8 @@ const PROFILE_KEY = 'career-os-profile';
 const STORY_BANK_KEY = 'career-os-story-bank';
 const PRACTICED_QUESTIONS_KEY = 'career-os-practiced-questions';
 const LEARNING_PLAN_KEY = 'career-os-learning-plan';
+const LEARNING_ROADMAP_KEY = 'career-os-learning-roadmap';
+const LEARNING_TAB_KEY = 'career-os-learning-tab';
 
 export const DEFAULT_LABEL_NAME = 'Referral requested';
 
@@ -163,6 +165,40 @@ export function getStoryBank() {
 
 export function saveStoryBank(bank) {
   localStorage.setItem(STORY_BANK_KEY, JSON.stringify(bank));
+}
+
+export function getLearningRoadmapProgress() {
+  const raw = localStorage.getItem(LEARNING_ROADMAP_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function saveLearningRoadmapProgress(progress) {
+  localStorage.setItem(LEARNING_ROADMAP_KEY, JSON.stringify(progress || {}));
+}
+
+export function getLearningTab() {
+  try {
+    const tab = sessionStorage.getItem(LEARNING_TAB_KEY);
+    return tab === 'stories' || tab === 'roadmap' ? tab : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLearningTab(tab) {
+  try {
+    if (tab === 'stories' || tab === 'roadmap') {
+      sessionStorage.setItem(LEARNING_TAB_KEY, tab);
+    }
+  } catch {
+    // ignore
+  }
 }
 
 export function getPracticedQuestions() {
