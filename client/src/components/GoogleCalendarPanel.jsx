@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Calendar, Link2, Unlink, RefreshCw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Calendar, Link2, Unlink, RefreshCw, Check } from 'lucide-react';
 import { useAuth } from '../hooks';
 import { authHeaders } from '../storage';
 
@@ -16,17 +16,47 @@ function formatEventWhen(start) {
   });
 }
 
-export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
+const SECTION_META = {
+  update_existing: {
+    title: 'Updates to companies you already track',
+    hint: 'Interview progress on existing pipeline companies. Selected by default.',
+  },
+  create_new: {
+    title: 'Possible new companies',
+    hint: 'Looks like interviews with employers not yet on your dashboard. Off by default.',
+  },
+  filtered_out: {
+    title: 'Filtered out / not auto-suggested',
+    hint: 'Tasks, prep, ambiguous, or already-up-to-date events. Turn on any you still want to add.',
+  },
+};
+
+export default function GoogleCalendarPanel({ enabled = true, applications = [], onSynced }) {
   const { isAuthenticated, getToken } = useAuth();
   const [status, setStatus] = useState({ configured: false, connected: false });
-  const [events, setEvents] = useState([]);
-  const [applied, setApplied] = useState([]);
-  const [skipped, setSkipped] = useState([]);
-  const [groups, setGroups] = useState([]);
+  const [proposals, setProposals] = useState([]);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [loading, setLoading] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(null);
   const [error, setError] = useState(null);
+  const [classifier, setClassifier] = useState(null);
+
+  const sections = useMemo(() => {
+    const grouped = {
+      update_existing: [],
+      create_new: [],
+      filtered_out: [],
+    };
+    for (const proposal of proposals) {
+      const key = grouped[proposal.category] ? proposal.category : 'filtered_out';
+      grouped[key].push(proposal);
+    }
+    return grouped;
+  }, [proposals]);
+
+  const selectedCount = selectedIds.size;
 
   const loadStatus = async () => {
     if (!isAuthenticated || !enabled) return;
@@ -45,54 +75,101 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
     }
   };
 
-  const syncCalendar = async () => {
+  const previewCalendar = async () => {
     if (!isAuthenticated) return;
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('/api/google/sync', {
+      setMessage(null);
+      const res = await fetch('/api/google/preview', {
         method: 'POST',
         headers: await authHeaders(getToken),
+        body: JSON.stringify({ existingApplications: applications }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Failed to sync calendar');
+      if (!res.ok) throw new Error(data.error || 'Failed to review calendar');
 
-      setEvents(Array.isArray(data.events) ? data.events : []);
-      setApplied(Array.isArray(data.applied) ? data.applied : []);
-      setSkipped(Array.isArray(data.skipped) ? data.skipped : []);
-      setGroups(Array.isArray(data.groups) ? data.groups : []);
+      const next = Array.isArray(data.proposals) ? data.proposals : [];
+      setProposals(next);
+      setSelectedIds(new Set(next.filter((p) => p.defaultSelected).map((p) => p.id)));
+      setClassifier(data.classifier || null);
 
-      const updated = data.updatedCount || 0;
-      const created = data.createdCount || 0;
-      const skippedCount = data.skippedCount || 0;
-      const mode = data.classifier === 'llm' ? 'LLM' : 'heuristic';
-      if ((data.matched || 0) === 0) {
-        setMessage('No job-related events found (personal calendar not listed).');
+      const counts = data.counts || {};
+      if (next.length === 0) {
+        setMessage('No interview-related events found in this window.');
       } else {
         setMessage(
-          `Intelligence [${mode}]: ${updated} updated, ${created} added, ${skippedCount} skipped across ${(data.groups || []).length} company group${(data.groups || []).length === 1 ? '' : 's'}.`
+          `Review ready [${data.classifier === 'llm' ? 'LLM' : 'heuristic'}]: ${counts.updateExisting || 0} existing updates, ${counts.createNew || 0} possible new companies, ${counts.filteredOut || 0} filtered out. Nothing written yet.`
         );
-      }
-
-      if (Array.isArray(data.applications) && onSynced) {
-        onSynced(data.applications, data.applied || []);
       }
     } catch (e) {
       setError(e.message);
-      setEvents([]);
-      setApplied([]);
-      setSkipped([]);
-      setGroups([]);
+      setProposals([]);
+      setSelectedIds(new Set());
     } finally {
       setLoading(false);
     }
+  };
+
+  const applySelected = async () => {
+    if (!isAuthenticated || selectedCount === 0) return;
+    try {
+      setApplying(true);
+      setError(null);
+      const selected = proposals.filter((p) => selectedIds.has(p.id));
+      const res = await fetch('/api/google/apply', {
+        method: 'POST',
+        headers: await authHeaders(getToken),
+        body: JSON.stringify({
+          existingApplications: applications,
+          proposals: selected,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to apply calendar choices');
+
+      if (Array.isArray(data.applications) && onSynced) {
+        onSynced(data.applications);
+      }
+
+      setMessage(
+        `Applied ${data.updatedCount || 0} update${(data.updatedCount || 0) === 1 ? '' : 's'} and ${data.createdCount || 0} new compan${(data.createdCount || 0) === 1 ? 'y' : 'ies'} to your dashboard.`
+      );
+      setProposals([]);
+      setSelectedIds(new Set());
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const toggleProposal = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const setSectionSelected = (category, on) => {
+    const ids = sections[category].map((p) => p.id);
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
   };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const google = params.get('google');
     if (google === 'connected') {
-      setMessage('Google Calendar connected.');
+      setMessage('Google Calendar connected. Review events before anything hits your dashboard.');
       window.history.replaceState({}, '', window.location.pathname);
     } else if (google === 'error') {
       setError(params.get('reason') || 'Google connection failed');
@@ -102,10 +179,7 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
 
   useEffect(() => {
     if (!isAuthenticated || !enabled) return;
-    (async () => {
-      const next = await loadStatus();
-      if (next?.connected) await syncCalendar();
-    })();
+    loadStatus();
   }, [isAuthenticated, enabled]);
 
   if (!enabled || !isAuthenticated) return null;
@@ -140,10 +214,8 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
         throw new Error(data.error || 'Failed to disconnect Google');
       }
       setStatus({ configured: true, connected: false });
-      setEvents([]);
-      setApplied([]);
-      setSkipped([]);
-      setGroups([]);
+      setProposals([]);
+      setSelectedIds(new Set());
       setMessage('Google Calendar disconnected.');
     } catch (e) {
       setError(e.message);
@@ -179,7 +251,8 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
       </div>
 
       <p className="google-cal-panel__hint">
-        After retrieval, an intelligence layer judges relevance, company vs task, existing vs new, and groups multiple events for the same employer before updating your pipeline.
+        Use calendar to check progress on companies you already track, and optionally catch interviews
+        with new employers. Nothing is written until you choose what to apply.
       </p>
 
       <div className="google-cal-panel__actions">
@@ -190,11 +263,25 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
           </button>
         ) : (
           <>
-            <button type="button" className="auth-btn auth-btn--primary" onClick={syncCalendar} disabled={loading || busy}>
+            <button
+              type="button"
+              className="auth-btn auth-btn--primary"
+              onClick={previewCalendar}
+              disabled={loading || busy || applying}
+            >
               <RefreshCw size={15} />
-              Sync to pipeline
+              {loading ? 'Reviewing…' : 'Review calendar'}
             </button>
-            <button type="button" className="auth-btn auth-btn--ghost" onClick={disconnect} disabled={busy}>
+            <button
+              type="button"
+              className="auth-btn auth-btn--primary"
+              onClick={applySelected}
+              disabled={loading || busy || applying || selectedCount === 0}
+            >
+              <Check size={15} />
+              {applying ? 'Applying…' : `Apply selected (${selectedCount})`}
+            </button>
+            <button type="button" className="auth-btn auth-btn--ghost" onClick={disconnect} disabled={busy || applying}>
               <Unlink size={15} />
               Disconnect
             </button>
@@ -205,71 +292,69 @@ export default function GoogleCalendarPanel({ enabled = true, onSynced }) {
       {message && <p className="google-cal-panel__msg">{message}</p>}
       {error && <p className="google-cal-panel__error">{error}</p>}
 
-      {status.connected && groups.length > 0 && (
-        <div className="google-cal-panel__groups">
-          <p className="google-cal-panel__empty">Company groups</p>
-          <ul>
-            {groups.slice(0, 12).map((group) => (
-              <li key={`${group.company}-${group.action}`}>
-                <strong>{group.company}</strong>
-                <span>{group.action} · {group.eventCount} event{group.eventCount === 1 ? '' : 's'}</span>
-                {group.reason && <em className="google-cal-panel__match">{group.reason}</em>}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {status.connected && applied.length > 0 && (
-        <div className="google-cal-panel__applied">
-          <p className="google-cal-panel__empty">Pipeline changes</p>
-          <ul>
-            {applied.slice(0, 12).map((item) => (
-              <li key={`${item.eventId}-${item.applicationId}`}>
-                <strong>{item.company}</strong>
-                <span>{item.changes.join(', ')}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {status.connected && skipped.length > 0 && (
-        <div className="google-cal-panel__skipped">
-          <p className="google-cal-panel__empty">Skipped (task / not a company)</p>
-          <ul>
-            {skipped.slice(0, 8).map((item) => (
-              <li key={item.eventId}>
-                <strong>{item.eventTitle}</strong>
-                <span>{item.reason}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {status.connected && (
-        <div className="google-cal-panel__events">
-          {loading ? (
-            <p className="google-cal-panel__empty">Syncing calendar…</p>
-          ) : events.length === 0 ? (
+      {status.connected && proposals.length > 0 && (
+        <div className="google-cal-panel__review">
+          {['update_existing', 'create_new', 'filtered_out'].map((category) => {
+            const items = sections[category];
+            if (!items.length) return null;
+            const meta = SECTION_META[category];
+            const selectedInSection = items.filter((p) => selectedIds.has(p.id)).length;
+            return (
+              <div key={category} className={`google-cal-panel__section google-cal-panel__section--${category}`}>
+                <div className="google-cal-panel__section-head">
+                  <div>
+                    <p className="google-cal-panel__empty">{meta.title}</p>
+                    <p className="google-cal-panel__section-hint">{meta.hint}</p>
+                  </div>
+                  <div className="google-cal-panel__section-actions">
+                    <button type="button" className="google-cal-panel__mini" onClick={() => setSectionSelected(category, true)}>
+                      All
+                    </button>
+                    <button type="button" className="google-cal-panel__mini" onClick={() => setSectionSelected(category, false)}>
+                      None
+                    </button>
+                    <span className="google-cal-panel__section-count">
+                      {selectedInSection}/{items.length}
+                    </span>
+                  </div>
+                </div>
+                <ul>
+                  {items.map((proposal) => {
+                    const canApply = proposal.kind !== 'filtered_info' && (proposal.application || proposal.patch);
+                    return (
+                    <li key={proposal.id}>
+                      <label className={`google-cal-panel__choice ${!canApply ? 'is-disabled' : ''}`}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(proposal.id)}
+                          disabled={!canApply}
+                          onChange={() => toggleProposal(proposal.id)}
+                        />
+                        <span className="google-cal-panel__choice-body">
+                          <strong>{proposal.eventTitle || proposal.company}</strong>
+                          <span>{formatEventWhen(proposal.eventStart)}</span>
+                          <em className="google-cal-panel__match">{proposal.summary}</em>
+                        </span>
+                      </label>
+                    </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            );
+          })}
+          {classifier && (
             <p className="google-cal-panel__empty">
-              No job-related events in this window.
+              Classifier: {classifier === 'llm' ? 'LLM' : 'heuristic'}
             </p>
-          ) : (
-            <ul>
-              {events.slice(0, 12).map((event) => (
-                <li key={event.id}>
-                  <strong>{event.title}</strong>
-                  <span>{formatEventWhen(event.start)}</span>
-                  {event.matchedCompany && (
-                    <em className="google-cal-panel__match">{event.matchedCompany}</em>
-                  )}
-                </li>
-              ))}
-            </ul>
           )}
         </div>
+      )}
+
+      {status.connected && !loading && proposals.length === 0 && (
+        <p className="google-cal-panel__empty">
+          Click Review calendar to pull interview events and choose what lands on your dashboard.
+        </p>
       )}
     </section>
   );

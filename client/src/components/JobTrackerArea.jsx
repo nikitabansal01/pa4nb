@@ -39,7 +39,11 @@ export default function JobTrackerArea({
         </header>
       )}
 
-      <GoogleCalendarPanel enabled={isAuthenticated} onSynced={onCalendarSynced} />
+      <GoogleCalendarPanel
+        enabled={isAuthenticated}
+        applications={applications}
+        onSynced={onCalendarSynced}
+      />
 
       <div className="job-tracker-area__toolbar">
         <div className="job-tracker-area__views" role="tablist" aria-label="Job search views">

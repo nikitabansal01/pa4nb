@@ -10,12 +10,9 @@ import {
   setLocalMeta,
   clearLocalData,
   authHeaders,
-  getLocalLifeDesign,
-  saveLocalLifeDesign,
   stripExamples,
   mergeApplications,
 } from './storage';
-import { DEFAULT_LIFE_DESIGN, normalizeLifeDesign } from './lifeDesign';
 import { isClerkConfigured } from './clerk';
 
 const API = '/api';
@@ -421,11 +418,13 @@ export function useApplications() {
 
   const applySyncedApplications = (apps) => {
     if (!Array.isArray(apps)) return;
-    setApplications(apps);
+    // Merge with whatever is already on screen so calendar sync cannot replace the pipeline.
+    setApplications((prev) => mergeApplications(prev, apps));
     setDataSource(isAuthenticated ? 'account' : 'local');
     if (!isAuthenticated) {
-      saveLocalApplications(apps);
-      setLocalMeta({ dataSource: apps.length ? 'local' : 'empty' });
+      const merged = mergeApplications(getLocalApplications() || [], apps);
+      saveLocalApplications(merged);
+      setLocalMeta({ dataSource: merged.length ? 'local' : 'empty' });
     }
   };
 
@@ -445,98 +444,6 @@ export function useApplications() {
     resetToExamples,
     syncToAccount,
     applySyncedApplications,
-  };
-}
-
-export function useLifeDesign() {
-  const [data, setData] = useState(() => normalizeLifeDesign(getLocalLifeDesign()));
-
-  const persist = useCallback((next) => {
-    const normalized = normalizeLifeDesign(next);
-    setData(normalized);
-    saveLocalLifeDesign(normalized);
-  }, []);
-
-  const setGauge = useCallback(
-    (areaId, value) => {
-      persist({
-        ...data,
-        dashboard: { ...data.dashboard, [areaId]: value },
-      });
-    },
-    [data, persist]
-  );
-
-  const setGaugeNote = useCallback(
-    (areaId, note) => {
-      persist({
-        ...data,
-        dashboardNotes: { ...data.dashboardNotes, [areaId]: note },
-      });
-    },
-    [data, persist]
-  );
-
-  const setWorkview = useCallback(
-    (text) => persist({ ...data, workview: text }),
-    [data, persist]
-  );
-
-  const setLifeview = useCallback(
-    (text) => persist({ ...data, lifeview: text }),
-    [data, persist]
-  );
-
-  const addAreaLogEntry = useCallback(
-    (areaId, { text, source = 'manual', energy, activity, person, focus } = {}) => {
-      const trimmed = text?.trim();
-      if (!trimmed) return null;
-
-      const newEntry = {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-        text: trimmed,
-        createdAt: new Date().toISOString(),
-        source,
-      };
-
-      if (energy != null) newEntry.energy = energy;
-      if (activity?.trim()) newEntry.activity = activity.trim();
-      if (person?.trim()) newEntry.person = person.trim();
-      if (focus?.trim()) newEntry.focus = focus.trim();
-
-      persist({
-        ...data,
-        areaLogs: {
-          ...data.areaLogs,
-          [areaId]: [newEntry, ...(data.areaLogs[areaId] || [])],
-        },
-      });
-      return newEntry;
-    },
-    [data, persist]
-  );
-
-  const deleteAreaLogEntry = useCallback(
-    (areaId, entryId) => {
-      persist({
-        ...data,
-        areaLogs: {
-          ...data.areaLogs,
-          [areaId]: (data.areaLogs[areaId] || []).filter((e) => e.id !== entryId),
-        },
-      });
-    },
-    [data, persist]
-  );
-
-  return {
-    data,
-    setGauge,
-    setGaugeNote,
-    setWorkview,
-    setLifeview,
-    addAreaLogEntry,
-    deleteAreaLogEntry,
   };
 }
 

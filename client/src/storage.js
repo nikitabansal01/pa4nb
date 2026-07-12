@@ -1,6 +1,5 @@
 const STORAGE_KEY = 'pa-for-nb-applications';
 const LABELS_KEY = 'pa-for-nb-labels';
-const LIFE_DESIGN_KEY = 'pa-for-nb-life-design';
 const META_KEY = 'pa-for-nb-meta';
 
 export const DEFAULT_LABEL_NAME = 'Referral requested';
@@ -64,20 +63,6 @@ export function getLocalMeta() {
 
 export function setLocalMeta(meta) {
   localStorage.setItem(META_KEY, JSON.stringify(meta));
-}
-
-export function getLocalLifeDesign() {
-  const raw = localStorage.getItem(LIFE_DESIGN_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
-
-export function saveLocalLifeDesign(data) {
-  localStorage.setItem(LIFE_DESIGN_KEY, JSON.stringify(data));
 }
 
 export function clearLocalData() {

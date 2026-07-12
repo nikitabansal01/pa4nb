@@ -42,7 +42,11 @@ import {
   deleteGoogleTokens,
   publicGoogleStatus,
 } from './googleStore.js';
-import { buildCalendarSyncPlan, applyCalendarSyncPlan } from './calendarSync.js';
+import {
+  buildCalendarSyncPlan,
+  buildCalendarReviewProposals,
+  applySelectedProposals,
+} from './calendarSync.js';
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -68,7 +72,7 @@ app.get('/', (_req, res) => {
       applications: 'GET/POST/PUT/DELETE /api/applications (auth required)',
       labels: 'GET/POST/PUT/DELETE /api/labels (auth required)',
       voiceDump: 'POST /api/voice-dump',
-      google: 'GET /api/google/status | /api/google/connect | POST /api/google/sync | DELETE /api/google/disconnect',
+      google: 'GET /api/google/status | /api/google/connect | POST /api/google/preview | POST /api/google/apply | DELETE /api/google/disconnect',
       meta: '/api/meta',
     },
   });
@@ -378,7 +382,7 @@ app.get('/api/google/events', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/google/sync', requireAuth, async (req, res) => {
+async function previewGoogleCalendar(req, res) {
   try {
     if (!isGoogleConfigured()) {
       return res.status(503).json({ error: 'Google Calendar is not configured on this server' });
@@ -393,35 +397,72 @@ app.post('/api/google/sync', requireAuth, async (req, res) => {
       await writeGoogleTokens(req.user.id, next);
     });
 
-    const existing = await getUserApplications(req.user.id);
+    const storedApps = await getUserApplications(req.user.id);
+    const clientApps = Array.isArray(req.body?.existingApplications)
+      ? req.body.existingApplications
+      : [];
+    const existing = mergeApplicationLists(storedApps, clientApps);
     const { candidates, queriesRun } = await fetchJobCandidateEvents(accessToken, existing);
     const events = filterJobRelatedEvents(candidates, existing);
     candidates.length = 0;
 
     const plan = await buildCalendarSyncPlan(events, existing);
-    const { applications, applied, skipped, groups, cleanup, intelligenceMode } = applyCalendarSyncPlan(existing, plan);
-    await saveUserApplications(req.user.id, applications);
+    const proposals = buildCalendarReviewProposals(plan, events);
 
     res.json({
       events,
+      proposals,
       matched: events.length,
       queriesRun,
-      applied,
-      skipped: skipped || [],
-      groups: groups || [],
-      cleanup: cleanup || [],
-      updatedCount: applied.filter((item) => !item.created && item.kind !== 'cleanup').length,
-      createdCount: applied.filter((item) => item.created).length,
-      cleanupCount: applied.filter((item) => item.kind === 'cleanup').length,
-      skippedCount: (skipped || []).length,
-      classifier: intelligenceMode || (process.env.OPENAI_API_KEY ? 'llm' : 'heuristic'),
-      applications,
+      groups: plan.groups || [],
+      classifier: plan.intelligenceMode || (process.env.OPENAI_API_KEY ? 'llm' : 'heuristic'),
+      counts: {
+        updateExisting: proposals.filter((p) => p.category === 'update_existing').length,
+        createNew: proposals.filter((p) => p.category === 'create_new').length,
+        filteredOut: proposals.filter((p) => p.category === 'filtered_out').length,
+      },
       window: { daysBack: 7, daysForward: 21 },
-      filter: 'google-q-search-then-intelligence',
-      privacy: 'no-full-calendar-list-no-event-storage-intelligence-on-filtered-events-only',
+      filter: 'google-q-search-then-intelligence-review',
+      privacy: 'no-full-calendar-list-no-write-until-user-approves',
+      wrote: false,
     });
   } catch (error) {
-    console.error('Google calendar sync failed:', error);
+    console.error('Google calendar preview failed:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
+app.post('/api/google/preview', requireAuth, previewGoogleCalendar);
+app.post('/api/google/sync', requireAuth, previewGoogleCalendar);
+
+app.post('/api/google/apply', requireAuth, async (req, res) => {
+  try {
+    if (!isGoogleConfigured()) {
+      return res.status(503).json({ error: 'Google Calendar is not configured on this server' });
+    }
+
+    const selected = Array.isArray(req.body?.proposals) ? req.body.proposals : [];
+    if (selected.length === 0) {
+      return res.status(400).json({ error: 'Select at least one calendar proposal to apply' });
+    }
+
+    const storedApps = await getUserApplications(req.user.id);
+    const clientApps = Array.isArray(req.body?.existingApplications)
+      ? req.body.existingApplications
+      : [];
+    const existing = mergeApplicationLists(storedApps, clientApps);
+    const { applications, applied } = applySelectedProposals(existing, selected);
+    await saveUserApplications(req.user.id, applications);
+
+    res.json({
+      applications,
+      applied,
+      updatedCount: applied.filter((item) => !item.created).length,
+      createdCount: applied.filter((item) => item.created).length,
+      wrote: true,
+    });
+  } catch (error) {
+    console.error('Google calendar apply failed:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { DEFAULT_APPLICATION, STATUSES } from './constants.js';
-import { analyzeCalendarEvents } from './calendarIntelligence.js';
+import { analyzeCalendarEvents, extractEmployerName } from './calendarIntelligence.js';
 
 const STATUS_RANK = Object.fromEntries(STATUSES.map((status, index) => [status, index]));
 
@@ -306,6 +306,12 @@ export async function buildCalendarSyncPlan(events, applications) {
   };
 }
 
+function isCalendarDerived(app) {
+  if (!app) return false;
+  if ((app.googleEventIds || []).length > 0) return true;
+  return /Added from Google Calendar/i.test(app.notes || '');
+}
+
 function applyCleanup(applications, cleanup = []) {
   const byId = new Map((applications || []).map((app) => [app.id, { ...app }]));
   const appliedCleanup = [];
@@ -313,7 +319,8 @@ function applyCleanup(applications, cleanup = []) {
   for (const item of cleanup) {
     if (item.action === 'rename') {
       const app = byId.get(item.applicationId);
-      if (!app || app.isExample) continue;
+      // Only rename calendar-derived messy titles — never rewrite the user's pipeline names.
+      if (!app || app.isExample || !isCalendarDerived(app)) continue;
       const prev = app.company;
       byId.set(item.applicationId, {
         ...app,
@@ -328,6 +335,8 @@ function applyCleanup(applications, cleanup = []) {
       const from = byId.get(item.fromApplicationId);
       const into = byId.get(item.intoApplicationId);
       if (!from || !into || from.isExample || into.isExample) continue;
+      // Only merge away calendar-derived duplicates into a keeper.
+      if (!isCalendarDerived(from)) continue;
 
       const higherStatus =
         (STATUS_RANK[from.status] ?? -1) > (STATUS_RANK[into.status] ?? -1)
@@ -351,7 +360,8 @@ function applyCleanup(applications, cleanup = []) {
       });
     } else if (item.action === 'delete') {
       const app = byId.get(item.applicationId);
-      if (!app || app.isExample) continue;
+      // Never delete a company the user added themselves — only calendar-derived fakes/tasks.
+      if (!app || app.isExample || !isCalendarDerived(app)) continue;
       byId.delete(item.applicationId);
       appliedCleanup.push({
         ...item,
@@ -413,4 +423,159 @@ export function applyCalendarSyncPlan(applications, plan) {
     cleanup: plan.cleanup || [],
     intelligenceMode: plan.intelligenceMode || 'heuristic',
   };
+}
+
+function eventMeta(eventById, eventId, fallbackTitle = '') {
+  const event = eventById.get(eventId);
+  return {
+    eventId,
+    eventTitle: event?.title || fallbackTitle || '',
+    eventStart: event?.start || null,
+  };
+}
+
+/**
+ * Turn a sync plan into user-reviewable proposals.
+ * Nothing is written until the user selects and applies.
+ */
+export function buildCalendarReviewProposals(plan, events = []) {
+  const eventById = new Map((events || []).map((e) => [e.id, e]));
+  const proposals = [];
+
+  for (const update of plan.updates || []) {
+    const meta = eventMeta(eventById, update.eventId, update.eventTitle);
+    proposals.push({
+      id: `update:${update.applicationId}:${update.eventId}`,
+      category: 'update_existing',
+      defaultSelected: true,
+      company: update.company,
+      applicationId: update.applicationId,
+      ...meta,
+      summary: `Update ${update.company}: ${(update.changes || []).join(', ')}`,
+      changes: update.changes || [],
+      kind: update.kind || 'update',
+      created: false,
+      patch: update.patch || null,
+      application: null,
+    });
+  }
+
+  for (const create of plan.creates || []) {
+    const meta = eventMeta(eventById, create.eventId, create.eventTitle);
+    proposals.push({
+      id: `create:${create.application?.id || create.eventId}`,
+      category: 'create_new',
+      defaultSelected: false,
+      company: create.company,
+      applicationId: create.application?.id || null,
+      ...meta,
+      summary: `Add new company ${create.company}: ${(create.changes || []).join(', ')}`,
+      changes: create.changes || [],
+      kind: 'create',
+      created: true,
+      patch: null,
+      application: create.application || null,
+      groupedEventIds: create.groupedEventIds || [],
+    });
+  }
+
+  const seenSkipped = new Set();
+  for (const skipped of plan.skipped || []) {
+    if (!skipped?.eventId || seenSkipped.has(skipped.eventId)) continue;
+    seenSkipped.add(skipped.eventId);
+    const meta = eventMeta(eventById, skipped.eventId, skipped.eventTitle);
+    const guessedName = extractEmployerName(meta.eventTitle) || null;
+
+    const now = new Date().toISOString();
+    const iso = meta.eventStart && !Number.isNaN(new Date(meta.eventStart).getTime())
+      ? new Date(meta.eventStart).toISOString()
+      : null;
+
+    // Filtered items stay reviewable, but only offer "add company" when we can extract an employer.
+    proposals.push({
+      id: `filtered:${skipped.eventId}`,
+      category: 'filtered_out',
+      defaultSelected: false,
+      company: guessedName || '',
+      applicationId: null,
+      ...meta,
+      summary: guessedName
+        ? `Filtered out: ${meta.eventTitle} — could add as ${guessedName} (${skipped.reason || 'not auto-suggested'})`
+        : `Filtered out: ${meta.eventTitle} — ${skipped.reason || 'task/ambiguous, no employer extracted'}`,
+      changes: [skipped.reason || 'Filtered out by intelligence'],
+      reason: skipped.reason || 'Filtered out',
+      kind: guessedName ? 'create_from_filtered' : 'filtered_info',
+      created: Boolean(guessedName),
+      patch: null,
+      application: guessedName
+        ? {
+            id: uuidv4(),
+            createdAt: now,
+            updatedAt: now,
+            isExample: false,
+            ...DEFAULT_APPLICATION,
+            company: guessedName,
+            status: 'interview_scheduled',
+            processStepIndex: STATUS_TO_STEP.interview_scheduled ?? 3,
+            interviewDates: iso ? [iso] : [],
+            needsPrep: Boolean(iso && new Date(iso) >= new Date(Date.now() - 12 * 60 * 60 * 1000)),
+            googleEventIds: [skipped.eventId],
+            notes: `Added from Google Calendar (user override): ${meta.eventTitle}`,
+          }
+        : null,
+    });
+  }
+
+  return proposals;
+}
+
+/**
+ * Apply only user-selected proposals. Never runs cleanup deletes.
+ */
+export function applySelectedProposals(applications, selectedProposals = []) {
+  const byId = new Map((applications || []).map((app) => [app.id, { ...app }]));
+  const applied = [];
+
+  for (const proposal of selectedProposals) {
+    if (!proposal) continue;
+
+    if (proposal.kind === 'create' || proposal.kind === 'create_from_filtered') {
+      if (!proposal.application) continue;
+      const app = {
+        ...proposal.application,
+        isExample: false,
+        updatedAt: new Date().toISOString(),
+      };
+      byId.set(app.id, app);
+      applied.push({
+        ...proposal,
+        applicationId: app.id,
+        company: app.company,
+        created: true,
+        changes: proposal.changes || ['created company'],
+      });
+      continue;
+    }
+
+    if (!proposal.applicationId || !proposal.patch) continue;
+    const current = byId.get(proposal.applicationId);
+    if (!current || current.isExample) continue;
+    byId.set(proposal.applicationId, {
+      ...current,
+      ...proposal.patch,
+      isExample: false,
+      updatedAt: new Date().toISOString(),
+    });
+    applied.push({
+      ...proposal,
+      created: false,
+      changes: proposal.changes || ['updated'],
+    });
+  }
+
+  const next = [...byId.values()].sort(
+    (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
+  );
+
+  return { applications: next, applied };
 }

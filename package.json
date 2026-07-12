@@ -1,7 +1,7 @@
 {
   "name": "pa-for-nb",
   "version": "0.1.0",
-  "description": "Voice-powered job hunt personal assistant",
+  "description": "Voice-powered job hunt assistant with calendar sync",
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
