@@ -4408,6 +4408,52 @@
   min-width: 0;
 }
 
+.company-workspace--mock {
+  gap: 0.75rem;
+}
+
+/* Live mock: fill main column without clipping the composer off-screen */
+.app-shell__main:has(.company-workspace--mock-live) {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app-shell__main:has(.company-workspace--mock-live) > .header {
+  flex-shrink: 0;
+}
+
+.main:has(.company-workspace--mock-live) {
+  flex: 1;
+  min-height: 0;
+  max-width: none;
+  width: 100%;
+  padding: 0.75rem 1.25rem 1rem;
+  gap: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.company-workspace--mock-live {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.company-workspace--mock-live .company-workspace__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .workspace-panel {
   display: flex;
   flex-direction: column;
@@ -5746,20 +5792,83 @@
 
 
 /* Mock interview + study plan (company workspace) */
-.mock-interview__card {
+/* Mock interview chat */
+.mock-interview {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  overflow: hidden;
+}
+
+.mock-interview--live {
+  height: 100%;
+  min-height: 0;
+}
+
+.mock-interview__setup-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.mock-interview__hero h3 {
+  margin: 0.2rem 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.mock-interview__kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mock-interview__lede {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
 }
 
 .mock-interview__setup {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
-  align-items: end;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1rem;
+  align-items: start;
 }
 
-.mock-interview__setup .submit-btn {
+.mock-interview__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mock-interview__field > span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.mock-interview__setup-type {
+  grid-column: 1 / -1;
+}
+
+.mock-interview__style-blurb {
+  margin: 0.15rem 0 0;
+  font-size: 0.84rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.mock-interview__start {
   grid-column: 1 / -1;
   justify-self: start;
   display: inline-flex;
@@ -5767,88 +5876,454 @@
   gap: 0.45rem;
 }
 
-.mock-interview__transcript {
+.mock-chat {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-height: min(52vh, 520px);
-  overflow-y: auto;
-  padding: 0.25rem 0.15rem 0.5rem;
-}
-
-.mock-interview__bubble {
-  max-width: min(92%, 40rem);
-  padding: 0.75rem 0.95rem;
-  border-radius: 14px;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
   border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 92%, transparent);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
 }
 
-.mock-interview__bubble--interviewer {
-  align-self: flex-start;
-  border-color: color-mix(in srgb, var(--workspace-accent, var(--accent)) 35%, var(--border));
+.mock-chat__top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.85rem 1.05rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--workspace-accent, var(--accent)) 6%, transparent);
+  flex-shrink: 0;
 }
 
-.mock-interview__bubble--candidate {
-  align-self: flex-end;
-  background: color-mix(in srgb, var(--workspace-accent, var(--accent)) 14%, var(--surface));
+.mock-chat__top-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  min-width: 0;
 }
 
-.mock-interview__role {
-  display: block;
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.mock-chat__exit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  background: transparent;
   color: var(--text-muted);
-  margin-bottom: 0.35rem;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
-.mock-interview__bubble p {
-  margin: 0;
-  white-space: pre-wrap;
-  line-height: 1.45;
+.mock-chat__exit:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface-hover, var(--surface)) 80%, transparent);
 }
 
-.mock-interview__feedback {
-  padding: 0.85rem 1rem;
-  border-radius: 12px;
-  border: 1px dashed color-mix(in srgb, var(--accent-cyan, #67e8f9) 40%, var(--border));
-  background: color-mix(in srgb, var(--accent-cyan, #67e8f9) 8%, transparent);
+.mock-chat__title-block {
+  min-width: 0;
 }
 
-.mock-interview__feedback strong {
-  display: block;
-  margin-bottom: 0.35rem;
-  font-size: 0.85rem;
+.mock-chat__title {
+  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 650;
+  color: var(--text);
+  line-height: 1.2;
 }
 
-.mock-interview__feedback p {
-  margin: 0;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
-
-.mock-interview__compose {
-  margin-top: 0.25rem;
-}
-
-.mock-interview__footer {
+.mock-chat__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.75rem 1rem;
+  gap: 0.3rem 0.5rem;
+  min-width: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 
-.mock-interview__footer .auth-btn {
+.mock-chat__company {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.mock-chat__meta > span:not(.mock-chat__meta-pill):not(.mock-chat__company)::before {
+  content: '·';
+  margin-right: 0.5rem;
+  opacity: 0.45;
+}
+
+.mock-chat__meta-pill {
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--workspace-accent, var(--accent)) 18%, transparent);
+  font-size: 0.7rem;
+}
+
+.mock-chat__top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.mock-chat__insight-toggle,
+.mock-chat__end {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.mock-chat__insight-toggle.is-open,
+.mock-chat__insight-toggle:hover,
+.mock-chat__end:hover {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--workspace-accent, var(--accent)) 40%, var(--border));
+}
+
+.mock-chat__stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1.1rem 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  scroll-behavior: smooth;
+}
+
+.mock-chat__msg {
+  display: block;
+  width: min(100%, 44rem);
+  max-width: 100%;
+  animation: mock-chat-in 0.22s ease both;
+}
+
+.mock-chat__msg--candidate {
+  align-self: flex-end;
+}
+
+.mock-chat__bubble {
+  padding: 0.8rem 0.95rem;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--bg) 45%, var(--surface));
+}
+
+.mock-chat__msg--interviewer .mock-chat__bubble {
+  border-color: color-mix(in srgb, var(--workspace-accent, var(--accent)) 28%, var(--border));
+  background: color-mix(in srgb, var(--workspace-accent, var(--accent)) 7%, var(--surface));
+}
+
+.mock-chat__msg--candidate .mock-chat__bubble {
+  background: color-mix(in srgb, var(--workspace-accent, var(--accent)) 16%, transparent);
+  border-color: color-mix(in srgb, var(--workspace-accent, var(--accent)) 30%, transparent);
+  border-radius: 14px 14px 4px 14px;
+}
+
+.mock-chat__who {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mock-chat__pending {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.mock-chat__note {
+  align-self: stretch;
+  width: min(100%, 44rem);
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  background: color-mix(in srgb, var(--bg) 35%, transparent);
+}
+
+.mock-chat__note strong {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mock-chat__note ul {
+  margin: 0;
+  padding-left: 1.05rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.mock-chat__note--research {
+  border-color: color-mix(in srgb, var(--accent-cyan, #67e8f9) 30%, var(--border));
+  background: color-mix(in srgb, var(--accent-cyan, #67e8f9) 7%, transparent);
+}
+
+.mock-chat__note--feedback {
+  border-left: 2px solid color-mix(in srgb, var(--workspace-accent, var(--accent)) 55%, transparent);
+}
+
+.mock-chat__insight-drawer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  background: color-mix(in srgb, var(--surface-elevated, var(--surface)) 96%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.mock-chat__insight-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.85rem 1rem 0.4rem;
+  flex-shrink: 0;
+}
+
+.mock-chat__insight-drawer-head > strong {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mock-chat__insight-close {
+  padding: 0.3rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mock-chat__insight-drawer-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.5rem 1.1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: min(100%, 44rem);
+}
+
+.mock-chat__insight-drawer-body strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mock-chat__insight-drawer-body ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  line-height: 1.45;
+}
+
+.mock-chat__composer {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: end;
+  padding: 0.85rem 1.05rem 1rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--bg) 40%, var(--surface-elevated, var(--surface)));
+  z-index: 2;
+}
+
+.mock-chat__composer--live {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent-coral, #f07167) 40%, transparent);
+}
+
+.mock-chat__input {
+  width: 100%;
+  min-height: 4.25rem;
+  max-height: 9rem;
+  resize: none;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: color-mix(in srgb, var(--bg) 50%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.mock-chat__input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--workspace-accent, var(--accent)) 45%, var(--border));
+}
+
+.mock-chat__input::placeholder {
+  color: var(--text-muted);
+}
+
+.mock-chat__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.mock-chat__icon-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  border: 1px solid color-mix(in srgb, var(--border) 85%, transparent);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.mock-chat__icon-btn:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.mock-chat__icon-btn--live {
+  color: #fff;
+  background: var(--gradient-warm, linear-gradient(135deg, #f07167, #c44d56));
+  border-color: transparent;
+}
+
+.mock-chat__send {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 2.5rem;
+  padding: 0 0.9rem;
+  border-radius: 11px;
+  border: none;
+  color: #fff;
+  background: var(--gradient-primary, var(--accent));
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 560;
+}
+
+.mock-chat__icon-btn:disabled,
+.mock-chat__send:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.mock-md {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  color: var(--text);
+  font-size: 0.96rem;
+  line-height: 1.58;
+}
+
+.mock-md__p { margin: 0; }
+
+.mock-md__heading {
+  margin: 0.1rem 0 0;
+  font-family: var(--font-display);
+  font-size: 1.02rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.mock-md__list {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mock-md__list--ol { list-style: decimal; }
+
+.mock-md__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+  padding: 0.08rem 0.3rem;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+}
+
+.mock-md__pre {
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  overflow-x: auto;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg) 75%, #000);
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.mock-md__pre code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre;
 }
 
 .mock-interview__error {
   margin: 0;
+  padding: 0.55rem 1.05rem 0.85rem;
   color: #fca5a5;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  flex-shrink: 0;
+}
+
+@keyframes mock-chat-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 800px) {
+  .mock-interview__setup { grid-template-columns: 1fr; }
+  .main:has(.company-workspace--mock-live) {
+    padding: 0.5rem 0.7rem 0.75rem;
+  }
+  .mock-chat {
+    border-radius: 12px;
+  }
+  .mock-chat__composer {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .mock-chat__msg { width: 100%; }
 }
 
 .study-plan__actions {
@@ -5929,10 +6404,4 @@
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 0.15rem;
-}
-
-@media (max-width: 800px) {
-  .mock-interview__setup {
-    grid-template-columns: 1fr;
-  }
 }

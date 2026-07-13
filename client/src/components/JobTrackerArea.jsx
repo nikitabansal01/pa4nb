@@ -31,6 +31,7 @@ export default function JobTrackerArea({
   profile = null,
   direction = null,
   onLearningFromReflection,
+  onWorkspaceOpenChange,
 }) {
   const [jobTab, setJobTab] = useState('pipeline');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -42,6 +43,11 @@ export default function JobTrackerArea({
     () => applications.find((app) => app.id === selectedAppId) || null,
     [applications, selectedAppId]
   );
+
+  useEffect(() => {
+    onWorkspaceOpenChange?.(Boolean(selectedApp));
+    return () => onWorkspaceOpenChange?.(false);
+  }, [selectedApp, onWorkspaceOpenChange]);
 
   useEffect(() => {
     if (!focusCompanyId) return;

@@ -34,13 +34,18 @@ import { buildAssumptionsFromAnswers, buildCareerPaths } from './careerMocks';
 const API = '/api';
 
 function useGuestAuth() {
-  return {
-    user: null,
-    isAuthenticated: false,
-    authLoading: false,
-    getToken: async () => null,
-    signOut: async () => {},
-  };
+  const getToken = useCallback(async () => null, []);
+  const signOut = useCallback(async () => {}, []);
+  return useMemo(
+    () => ({
+      user: null,
+      isAuthenticated: false,
+      authLoading: false,
+      getToken,
+      signOut,
+    }),
+    [getToken, signOut]
+  );
 }
 
 function useClerkAppAuth() {

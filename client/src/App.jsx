@@ -60,6 +60,7 @@ export default function App() {
   const [activeNav, setActiveNav] = useState('today');
   const [interviewPrepFocus, setInterviewPrepFocus] = useState(null);
   const [companyFocus, setCompanyFocus] = useState(null);
+  const [companyWorkspaceOpen, setCompanyWorkspaceOpen] = useState(false);
 
   const handleContinuePrep = (appId, round = null) => {
     if (appId) {
@@ -207,18 +208,20 @@ export default function App() {
               />
             ) : activeNav === 'opportunities' ? (
               <>
-                <div className="ui-block ui-block--capture">
-                  <VoiceDump
-                    onSubmit={handleJobVoiceSubmit}
-                    processing={jobVoiceProcessing}
-                    currentArea="jobs"
-                  />
-                  {jobVoiceSummary && (
-                    <div className={`toast${jobVoiceSummary.startsWith('Error:') ? ' toast--error' : ''}`} role="status">
-                      {jobVoiceSummary}
-                    </div>
-                  )}
-                </div>
+                {!companyWorkspaceOpen && (
+                  <div className="ui-block ui-block--capture">
+                    <VoiceDump
+                      onSubmit={handleJobVoiceSubmit}
+                      processing={jobVoiceProcessing}
+                      currentArea="jobs"
+                    />
+                    {jobVoiceSummary && (
+                      <div className={`toast${jobVoiceSummary.startsWith('Error:') ? ' toast--error' : ''}`} role="status">
+                        {jobVoiceSummary}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <JobTrackerArea
                   applications={applications}
@@ -242,6 +245,7 @@ export default function App() {
                   focusCompanyId={companyFocus?.appId || null}
                   focusWorkspaceTab={companyFocus?.tab || 'overview'}
                   onFocusConsumed={() => setCompanyFocus(null)}
+                  onWorkspaceOpenChange={setCompanyWorkspaceOpen}
                 />
               </>
             ) : activeNav === 'direction' ? (

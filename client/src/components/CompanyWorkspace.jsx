@@ -94,6 +94,7 @@ export default function CompanyWorkspace({
     return 'overview';
   };
   const [tab, setTab] = useState(() => resolveTab(initialTab));
+  const [mockImmersive, setMockImmersive] = useState(false);
 
   const accent = STATUS_COLORS[app.status] || '#8B5CF6';
   const { steps, index, currentLabel } = getProcess(app);
@@ -103,10 +104,16 @@ export default function CompanyWorkspace({
   const reflection = useMemo(() => getReflectionDefaults(app), [app]);
   const timeline = useMemo(() => buildStageTimeline(app), [app]);
   const pathTitle = direction?.primaryTitle || roleFit.pathTitle;
+  const mockFocus = tab === 'mock';
+  const mockLive = mockFocus && mockImmersive;
 
   useEffect(() => {
     setTab(resolveTab(initialTab));
   }, [app.id, initialTab]);
+
+  useEffect(() => {
+    if (tab !== 'mock') setMockImmersive(false);
+  }, [tab]);
 
   const patchWorkspace = (partial, extra = {}) => {
     const workspace = { ...getWorkspace(app), ...partial };
@@ -160,45 +167,56 @@ export default function CompanyWorkspace({
   };
 
   return (
-    <section className="company-workspace" style={{ '--workspace-accent': accent }}>
-      <header className="company-workspace__header">
-        <button type="button" className="auth-btn company-workspace__back" onClick={onBack}>
-          <ArrowLeft size={16} />
-          Back to opportunities
-        </button>
-        <div className="company-workspace__title">
-          <div>
-            <p className="ui-block__label">Company workspace</p>
-            <h2>{overview.company}</h2>
-            <p>{overview.role || 'Role TBD'} · {currentLabel}</p>
-          </div>
-          <span
-            className="company-workspace__status"
-            style={{ '--status-color': accent }}
-          >
-            {STATUS_LABELS[app.status] || app.status}
-          </span>
-        </div>
-      </header>
+    <section
+      className={[
+        'company-workspace',
+        mockFocus ? 'company-workspace--mock' : '',
+        mockLive ? 'company-workspace--mock-live' : '',
+      ].filter(Boolean).join(' ')}
+      style={{ '--workspace-accent': accent }}
+    >
+      {!mockLive && (
+        <>
+          <header className="company-workspace__header">
+            <button type="button" className="auth-btn company-workspace__back" onClick={onBack}>
+              <ArrowLeft size={16} />
+              Back to opportunities
+            </button>
+            <div className="company-workspace__title">
+              <div>
+                <p className="ui-block__label">Company workspace</p>
+                <h2>{overview.company}</h2>
+                <p>{overview.role || 'Role TBD'} · {currentLabel}</p>
+              </div>
+              <span
+                className="company-workspace__status"
+                style={{ '--status-color': accent }}
+              >
+                {STATUS_LABELS[app.status] || app.status}
+              </span>
+            </div>
+          </header>
 
-      <div className="company-workspace__tabs" role="tablist" aria-label="Company workspace">
-        {TABS.map(({ id, label, shortLabel, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={tab === id}
-            aria-label={label}
-            title={label}
-            className={`company-workspace__tab${tab === id ? ' company-workspace__tab--active' : ''}`}
-            onClick={() => setTab(id)}
-          >
-            <Icon size={15} />
-            <span className="company-workspace__tab-label">{label}</span>
-            <span className="company-workspace__tab-short">{shortLabel}</span>
-          </button>
-        ))}
-      </div>
+          <div className="company-workspace__tabs" role="tablist" aria-label="Company workspace">
+            {TABS.map(({ id, label, shortLabel, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                aria-label={label}
+                title={label}
+                className={`company-workspace__tab${tab === id ? ' company-workspace__tab--active' : ''}`}
+                onClick={() => setTab(id)}
+              >
+                <Icon size={15} />
+                <span className="company-workspace__tab-label">{label}</span>
+                <span className="company-workspace__tab-short">{shortLabel}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="company-workspace__body" role="tabpanel">
         {tab === 'overview' && (
@@ -502,7 +520,13 @@ export default function CompanyWorkspace({
         )}
 
         {tab === 'mock' && (
-          <MockInterviewChat app={app} profile={profile} onUpdate={onUpdate} />
+          <MockInterviewChat
+            app={app}
+            profile={profile}
+            onUpdate={onUpdate}
+            onImmersiveChange={setMockImmersive}
+            onExitWorkspace={onBack}
+          />
         )}
 
         {tab === 'plan' && (

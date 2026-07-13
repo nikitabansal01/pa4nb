@@ -393,7 +393,7 @@ export async function parseCareerResume({
   try {
     const openai = new OpenAI({ apiKey });
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
