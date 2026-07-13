@@ -2,6 +2,17 @@
   "installCommand": "npm install && cd client && npm install",
   "buildCommand": "cd client && npm run build",
   "outputDirectory": "client/dist",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Permissions-Policy",
+          "value": "microphone=(self), camera=(), geolocation=()"
+        }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }

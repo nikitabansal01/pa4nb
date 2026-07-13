@@ -11,6 +11,7 @@ const AREA_PLACEHOLDERS = {
   overview: 'How life feels right now — type or tap the mic',
 };
 
+/** Original Voice Dump mic UX — browser speech recognition, live transcript. */
 export default function VoiceDump({ onSubmit, processing, currentArea = 'overview' }) {
   const speech = useSpeechToText();
   const areaPlaceholder = AREA_PLACEHOLDERS[currentArea] || AREA_PLACEHOLDERS.overview;
@@ -78,6 +79,9 @@ export default function VoiceDump({ onSubmit, processing, currentArea = 'overvie
           </button>
         </div>
       </div>
+      {speech.error && (
+        <p className="voice-panel__unsupported" role="alert">{speech.error}</p>
+      )}
     </section>
   );
 }

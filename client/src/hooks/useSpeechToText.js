@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 function combineText(transcript, interim) {
   if (!interim) return transcript;
   if (!transcript) return interim;
-  return `${transcript} ${interim}`;
+  return `${transcript} ${interim}`.replace(/\s+/g, ' ').trim();
 }
 
 export function isSpeechRecognitionSupported() {
@@ -12,28 +12,37 @@ export function isSpeechRecognitionSupported() {
 }
 
 /**
- * Browser speech-to-text (Web Speech API). Progressive enhancement only.
- *
- * Chrome often ends a recognition session after brief silence even with
- * continuous=true. We treat "listening" as user intent and restart until
- * the user explicitly stops.
+ * Browser speech-to-text — same approach as the original Voice Dump.
+ * Words appear live in the text field while you speak.
  */
-export default function useSpeechToText({ lang = 'en-US', continuous = true } = {}) {
+export default function useSpeechToText() {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interim, setInterim] = useState('');
+  const [error, setError] = useState(null);
+
   const recognitionRef = useRef(null);
   const wantListeningRef = useRef(false);
+  const transcriptRef = useRef('');
+  const interimRef = useRef('');
   const supported = isSpeechRecognitionSupported();
+
+  useEffect(() => {
+    transcriptRef.current = transcript;
+  }, [transcript]);
+
+  useEffect(() => {
+    interimRef.current = interim;
+  }, [interim]);
 
   useEffect(() => {
     if (!supported) return undefined;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
-    recognition.continuous = continuous;
+    recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = lang;
+    recognition.lang = 'en-US';
 
     recognition.onresult = (event) => {
       let finalText = '';
@@ -46,32 +55,47 @@ export default function useSpeechToText({ lang = 'en-US', continuous = true } = 
       }
 
       if (finalText) {
-        setTranscript((prev) => combineText(prev, finalText));
+        const next = combineText(transcriptRef.current, finalText);
+        transcriptRef.current = next;
+        setTranscript(next);
       }
+      interimRef.current = interimText;
       setInterim(interimText);
+      setError(null);
     };
 
     recognition.onerror = (event) => {
       const code = event?.error;
-      // Brief silence / normal stop — keep intent if user still wants mic on.
-      if (code === 'no-speech' || code === 'aborted') return;
-      wantListeningRef.current = false;
-      setListening(false);
-      setInterim('');
+      if (code === 'aborted' || code === 'no-speech') return;
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        wantListeningRef.current = false;
+        setListening(false);
+        setError('Microphone permission blocked. Allow mic access for this site and try again.');
+        return;
+      }
+      // Keep listening intent for transient errors; onend may restart.
     };
 
     recognition.onend = () => {
+      // Commit any leftover interim text.
+      if (interimRef.current.trim()) {
+        const next = combineText(transcriptRef.current, interimRef.current);
+        transcriptRef.current = next;
+        setTranscript(next);
+        interimRef.current = '';
+        setInterim('');
+      }
+
       if (!wantListeningRef.current) {
         setListening(false);
-        setInterim('');
         return;
       }
-      // Chrome dropped the session; restart so the mic stays active.
+
+      // Chrome often ends sessions after a pause — restart until user stops.
       try {
         recognition.start();
         setListening(true);
       } catch {
-        // start() throws if already starting; retry shortly.
         window.setTimeout(() => {
           if (!wantListeningRef.current) return;
           try {
@@ -81,7 +105,7 @@ export default function useSpeechToText({ lang = 'en-US', continuous = true } = 
             wantListeningRef.current = false;
             setListening(false);
           }
-        }, 120);
+        }, 200);
       }
     };
 
@@ -90,17 +114,27 @@ export default function useSpeechToText({ lang = 'en-US', continuous = true } = 
     return () => {
       wantListeningRef.current = false;
       try {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
         recognition.stop();
       } catch {
         // ignore
       }
+      recognitionRef.current = null;
     };
-  }, [supported, lang, continuous]);
+  }, [supported]);
 
   const stop = useCallback(() => {
     wantListeningRef.current = false;
     setListening(false);
-    setInterim('');
+    if (interimRef.current.trim()) {
+      const next = combineText(transcriptRef.current, interimRef.current);
+      transcriptRef.current = next;
+      setTranscript(next);
+      interimRef.current = '';
+      setInterim('');
+    }
     try {
       recognitionRef.current?.stop();
     } catch {
@@ -109,40 +143,54 @@ export default function useSpeechToText({ lang = 'en-US', continuous = true } = 
   }, []);
 
   const start = useCallback(() => {
-    if (!supported) return;
+    if (!supported || !recognitionRef.current) {
+      setError('Voice input needs Chrome or Safari. You can still type your answer.');
+      return;
+    }
+    setError(null);
     wantListeningRef.current = true;
     setListening(true);
     try {
-      recognitionRef.current?.start();
+      recognitionRef.current.start();
     } catch {
-      // Already started — stay in listening intent.
+      // Already started
     }
   }, [supported]);
 
   const toggle = useCallback(() => {
-    if (!supported) return;
+    if (!supported) {
+      setError('Voice input needs Chrome or Safari. You can still type your answer.');
+      return;
+    }
     if (wantListeningRef.current || listening) stop();
     else start();
   }, [supported, listening, start, stop]);
 
   const reset = useCallback(() => {
+    transcriptRef.current = '';
+    interimRef.current = '';
     setTranscript('');
     setInterim('');
+    setError(null);
   }, []);
 
   const setText = useCallback((value) => {
-    setTranscript(value);
+    const next = value ?? '';
+    transcriptRef.current = next;
+    interimRef.current = '';
+    setTranscript(next);
     setInterim('');
   }, []);
-
-  const displayText = combineText(transcript, interim);
 
   return {
     supported,
     listening,
+    transcribing: false,
+    elapsedSec: 0,
     transcript,
     interim,
-    displayText,
+    displayText: combineText(transcript, interim),
+    error,
     start,
     stop,
     toggle,

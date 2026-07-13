@@ -54,6 +54,7 @@ import { recommendCareerRoutes } from './careerIntelligence.js';
 import { parseCareerResume } from './resumeParse.js';
 import { extractResumeTextFromFile, RESUME_UPLOAD_ACCEPT } from './resumeExtract.js';
 import { runMockInterviewTurn, generateStudyPlan } from './mockInterview.js';
+import { isSpeechToTextConfigured, transcribeAudioBuffer } from './speechToText.js';
 import multer from 'multer';
 
 const app = express();
@@ -63,6 +64,10 @@ const LEGACY_DB = join(__dirname, '..', 'db.json');
 const resumeUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: RESUME_UPLOAD_ACCEPT.maxBytes },
+});
+const speechUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
 });
 
 app.use(cors());
@@ -88,6 +93,7 @@ app.get('/', (_req, res) => {
       careerRecommend: 'POST /api/career/recommend',
       careerParseResume: 'POST /api/career/parse-resume',
       mockInterview: 'POST /api/mock-interview/turn | POST /api/mock-interview/plan',
+      speechToText: 'POST /api/speech-to-text',
       google: 'GET /api/google/status | /api/google/connect | POST /api/google/preview | POST /api/google/apply | DELETE /api/google/disconnect',
       meta: '/api/meta',
     },
@@ -99,6 +105,7 @@ app.get('/api/health', (_req, res) => {
   res.json({
     ok: true,
     aiEnabled: Boolean(process.env.OPENAI_API_KEY),
+    speechToTextEnabled: isSpeechToTextConfigured(),
     authEnabled: isClerkEnabled(),
     googleCalendarEnabled: isGoogleConfigured(),
     storage,
@@ -371,6 +378,7 @@ app.post('/api/mock-interview/turn', optionalAuth, async (req, res) => {
       feedback: result.feedback,
       done: Boolean(result.done),
       drillQuestions: result.drillQuestions || [],
+      researchAssist: result.researchAssist || null,
       mode: result.mode,
       aiEnabled: Boolean(process.env.OPENAI_API_KEY),
     });
@@ -403,6 +411,46 @@ app.post('/api/mock-interview/plan', optionalAuth, async (req, res) => {
     res.status(500).json({ error: error.message || 'Failed to generate study plan' });
   }
 });
+
+app.post(
+  '/api/speech-to-text',
+  optionalAuth,
+  (req, res, next) => {
+    speechUpload.single('audio')(req, res, (err) => {
+      if (err) {
+        const message =
+          err.code === 'LIMIT_FILE_SIZE'
+            ? 'Recording is too large (max 25MB).'
+            : err.message || 'Audio upload failed';
+        return res.status(400).json({ error: message });
+      }
+      next();
+    });
+  },
+  async (req, res) => {
+    try {
+      if (!req.file?.buffer) {
+        return res.status(400).json({ error: 'Audio file is required' });
+      }
+
+      const result = await transcribeAudioBuffer({
+        buffer: req.file.buffer,
+        mimeType: req.file.mimetype || 'audio/webm',
+        fileName: req.file.originalname || 'speech.webm',
+      });
+
+      res.json({
+        text: result.text,
+        mode: result.mode,
+        speechToTextEnabled: true,
+      });
+    } catch (error) {
+      console.error('Speech-to-text failed:', error);
+      const status = error.status || 500;
+      res.status(status).json({ error: error.message || 'Failed to transcribe audio' });
+    }
+  }
+);
 
 app.post(
   '/api/career/parse-resume',

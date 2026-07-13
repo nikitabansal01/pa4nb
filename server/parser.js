@@ -283,7 +283,7 @@ export async function parseVoiceDump(transcript, existingApps) {
   try {
     const openai = new OpenAI({ apiKey });
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.4-mini',
       temperature: 0.2,
       response_format: { type: 'json_object' },
       messages: [
